@@ -1,6 +1,7 @@
 # 星尘驿站 Stardust Relay
 
 **👉 现在就开始玩：https://stardust-relay.vercel.app**
+**源码：https://github.com/Simea-l/stardust-relay**
 
 ---
 
