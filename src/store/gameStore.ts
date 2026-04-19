@@ -45,6 +45,7 @@ interface GameState {
   scanProgress: number
   brewProgress: number
   speechEnabled: boolean
+  isResting: boolean
 
   // Actions
   tick: () => void
@@ -59,6 +60,7 @@ interface GameState {
   unlockMacro: () => void
   addLog: (message: string, type?: LogEntry['type']) => void
   toggleSpeech: () => void
+  toggleRest: () => void
 }
 
 const POWER_DRAIN: Record<PowerMode, number> = {
@@ -90,59 +92,37 @@ export const useGameStore = create<GameState>((set, get) => ({
   scanProgress: 0,
   brewProgress: 0,
   speechEnabled: false,
+  isResting: false,
 
   tick: () => {
     const state = get()
     if (state.phase === 'gameover') return
 
-    const drain = POWER_DRAIN[state.mode]
-    let newEnergy = state.resources.energy - drain
-    let newOxygen = state.resources.oxygen - drain * 0.5
+    // 休息模式：能源不消耗，紧急/游戏结束也不触发
+    const drain = state.isResting ? 0 : POWER_DRAIN[state.mode]
+    const newEnergy = state.isResting ? state.resources.energy : state.resources.energy - drain
+    const newOxygen = state.isResting ? state.resources.oxygen : state.resources.oxygen - drain * 0.5
     let newMaterial = state.resources.material
 
-    // Auto collectors
+    // 自动化小球：休息中也正常收集
     if (state.autoCollectors > 0) {
       newMaterial += state.autoCollectors * 0.02
     }
 
-    // Emergency trigger
-    if (newEnergy <= 5 && state.phase !== 'emergency') {
-      set({
-        phase: 'emergency',
-        mode: 'eco',
-        dialogText: '警告：电力储备低于 5%。自动切换至节能模式。所有非必要系统已关闭。请尽快补充能源。',
-        dialogSpeaker: 'ALERT // 能源管理',
-        resources: { ...state.resources, energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
-      })
-      get().addLog('电力危机！自动切换节能模式。', 'error')
-      return
-    }
-
-    // Game over
-    if (newEnergy <= 0) {
-      set({
-        phase: 'gameover',
-        resources: { ...state.resources, energy: 0 },
-        dialogText: '能源耗尽。星尘驿站进入休眠模式。所有系统离线。谢谢你曾经在这里。',
-        dialogSpeaker: 'SYSTEM // FINAL',
-      })
-      get().addLog('能源耗尽。游戏结束。', 'error')
-      return
-    }
-
-    // Recovery from emergency
-    if (state.phase === 'emergency' && newEnergy > 20) {
+    // ===== 以下处理不受休息影响 =====
+    // 紧急状态恢复（仅在非休息时生效）
+    if (!state.isResting && state.phase === 'emergency' && newEnergy > 20) {
       set({
         phase: 'idle',
         dialogText: '电力恢复至安全水平。系统逐步重启中。星尘驿站恢复运行。',
         dialogSpeaker: 'SYSTEM // 星尘驿站',
-        resources: { ...state.resources, energy: newEnergy, oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
+        resources: { energy: newEnergy, oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
       })
       get().addLog('电力恢复，系统重启。', 'info')
       return
     }
 
-    // Scanning progress
+    // 扫描进度
     if (state.phase === 'scanning') {
       const newProgress = state.scanProgress + 1.5
       if (newProgress >= 100) {
@@ -153,19 +133,19 @@ export const useGameStore = create<GameState>((set, get) => ({
           scanProgress: 0,
           dialogText: npc.intro,
           dialogSpeaker: `SIGNAL // ${npc.name}`,
-          resources: { ...state.resources, energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
+          resources: { energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
         })
         get().addLog(`检测到访客信号：${npc.name}`, 'info')
       } else {
         set({
           scanProgress: newProgress,
-          resources: { ...state.resources, energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
+          resources: { energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
         })
       }
       return
     }
 
-    // Brewing progress
+    // 酿造进度
     if (state.phase === 'brewing') {
       const newProgress = state.brewProgress + 3
       if (newProgress >= 100) {
@@ -174,9 +154,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         const check = checkSuccess(result, { x: target.targetX, y: target.targetY, z: target.targetZ })
 
         if (check.success) {
-          const rewardEnergy = 25
-          const rewardOxygen = 15
-          const rewardMaterial = 25
           const line = target.successLines[Math.floor(Math.random() * target.successLines.length)]
           set({
             phase: 'success',
@@ -184,28 +161,26 @@ export const useGameStore = create<GameState>((set, get) => ({
             resultParams: result,
             score: state.score + 100,
             servedCount: state.servedCount + 1,
+            day: state.day + 1,
             resources: {
-              energy: Math.min(100, Math.max(0, newEnergy) + rewardEnergy),
-              oxygen: Math.min(100, Math.max(0, newOxygen) + rewardOxygen),
-              material: Math.min(100, Math.max(0, newMaterial) + rewardMaterial),
+              energy: Math.min(100, Math.max(0, newEnergy) + 25),
+              oxygen: Math.min(100, Math.max(0, newOxygen) + 15),
+              material: Math.min(100, Math.max(0, newMaterial) + 25),
             },
             dialogText: line,
             dialogSpeaker: target.name,
           })
           get().addLog(`调制成功！${target.name} 已治愈。+100 积分`, 'success')
         } else {
-          const penaltyEnergy = 3
-          const penaltyOxygen = 1
-          const penaltyMaterial = 3
           const line = target.failLines[Math.floor(Math.random() * target.failLines.length)]
           set({
             phase: 'failed',
             brewProgress: 0,
             resultParams: result,
             resources: {
-              energy: Math.max(0, Math.max(0, newEnergy) - penaltyEnergy),
-              oxygen: Math.max(0, Math.max(0, newOxygen) - penaltyOxygen),
-              material: Math.max(0, Math.max(0, newMaterial) - penaltyMaterial),
+              energy: Math.max(0, Math.max(0, newEnergy) - 3),
+              oxygen: Math.max(0, Math.max(0, newOxygen) - 1),
+              material: Math.max(0, Math.max(0, newMaterial) - 3),
             },
             dialogText: line,
             dialogSpeaker: target.name,
@@ -215,29 +190,28 @@ export const useGameStore = create<GameState>((set, get) => ({
       } else {
         set({
           brewProgress: newProgress,
-          resources: { ...state.resources, energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
+          resources: { energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
         })
       }
       return
     }
 
-    // Auto arrival in idle (random chance)
-    if (state.phase === 'idle') {
-      const shouldArrive = Math.random() < 0.003 // ~0.3% per tick (~100ms)
-      if (shouldArrive) {
+    // 休息时不自动接待访客
+    if (state.phase === 'idle' && !state.isResting) {
+      if (Math.random() < 0.003) {
         set({
           phase: 'scanning',
           scanProgress: 0,
           dialogText: '检测到深空信号... 正在解析来源与频率...',
           dialogSpeaker: 'SCANNER // 信号分析',
-          resources: { ...state.resources, energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
+          resources: { energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
         })
         get().addLog('检测到深空信号，开始扫描...', 'info')
         return
       }
     }
 
-    // Normal resource drain
+    // 正常资源消耗（休息时只更新材料）
     set({
       resources: {
         energy: Math.max(0, newEnergy),
@@ -386,5 +360,34 @@ export const useGameStore = create<GameState>((set, get) => ({
   toggleSpeech: () => {
     const state = get()
     set({ speechEnabled: !state.speechEnabled })
+  },
+
+  toggleRest: () => {
+    const state = get()
+    if (state.isResting) {
+      // 退出休息模式
+      set({
+        isResting: false,
+        dialogText: '调度员已回归。星尘驿站恢复正常运行。深空依旧，等待下一个信号。',
+        dialogSpeaker: 'SYSTEM // 星尘驿站',
+      })
+      get().addLog('调度员回归，驿站恢复正常运行。', 'info')
+    } else {
+      // 进入休息模式
+      // 若有访客在场，自动送走
+      const farewellText = state.npc
+        ? '调度员进入休息状态。星尘驿站进入节能休眠，访客请稍后再来。'
+        : '调度员进入休息状态。星尘驿站进入节能休眠，所有非必要系统已关闭。'
+      set({
+        isResting: true,
+        phase: 'idle',
+        npc: null,
+        slots: [null, null, null],
+        resultParams: null,
+        dialogText: farewellText,
+        dialogSpeaker: 'SYSTEM // 星尘驿站',
+      })
+      get().addLog('调度员休息，驿站进入休眠模式。', 'info')
+    }
   },
 }))

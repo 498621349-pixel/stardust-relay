@@ -57,6 +57,7 @@ export function ResourcePanel() {
   const phase = useGameStore((s) => s.phase)
   const score = useGameStore((s) => s.score)
   const servedCount = useGameStore((s) => s.servedCount)
+  const day = useGameStore((s) => s.day)
 
   const isEmergency = phase === 'emergency'
 
@@ -98,11 +99,11 @@ export function ResourcePanel() {
         {/* Score */}
         <div className="mt-2 p-2 rounded border border-cyan-glow/10 bg-cyan-glow/5">
           <div className="flex justify-between text-[11px] font-mono">
-            <span className="text-text-secondary">积分</span>
-            <span className="text-cyan-glow/80">{score}</span>
+            <span className="text-text-secondary">第 {day} 天</span>
+            <span className="text-cyan-glow/80">{score} 分</span>
           </div>
           <div className="flex justify-between text-[11px] font-mono mt-1">
-            <span className="text-text-secondary">治愈</span>
+            <span className="text-text-secondary">治愈访客</span>
             <span className="text-cyan-glow/80">{servedCount}</span>
           </div>
         </div>

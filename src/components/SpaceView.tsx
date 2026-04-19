@@ -155,19 +155,21 @@ function Star({ size, x, y, duration, color }: { size: number; x: number; y: num
 }
 
 // NPC 在星空视图中的可视化
-function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color: string; name: string; isSuccess?: boolean }) {
+function SpaceNPCVisual({ type, color, name, isSuccess, isFailed }: { type: string; color: string; name: string; isSuccess?: boolean; isFailed?: boolean }) {
   const getIcon = () => {
+    const muted = isFailed ? '#666666' : color
     switch (type) {
-      case '深空探索AI': return <Snowflake size={48} style={{ color: isSuccess ? '#00F2FF' : color }} />
-      case '货运飞船驾驶员': return <Flame size={48} style={{ color: isSuccess ? '#FFD700' : color }} />
-      case '通讯中继站AI': return <RadioIcon size={48} style={{ color: isSuccess ? '#AA64FF' : color }} />
-      case '冬眠宇航员': return <User size={48} style={{ color: isSuccess ? '#5EC0D8' : color }} />
-      case '艺术生成AI': return <Palette size={48} style={{ color: isSuccess ? '#FF6B9D' : color }} />
-      default: return <div className="w-12 h-12 rounded-full" style={{ backgroundColor: isSuccess ? '#00F2FF' : color }} />
+      case '深空探索AI': return <Snowflake size={48} style={{ color: isSuccess ? '#00F2FF' : muted }} />
+      case '货运飞船驾驶员': return <Flame size={48} style={{ color: isSuccess ? '#FFD700' : muted }} />
+      case '通讯中继站AI': return <RadioIcon size={48} style={{ color: isSuccess ? '#AA64FF' : muted }} />
+      case '冬眠宇航员': return <User size={48} style={{ color: isSuccess ? '#5EC0D8' : muted }} />
+      case '艺术生成AI': return <Palette size={48} style={{ color: isSuccess ? '#FF6B9D' : muted }} />
+      default: return <div className="w-12 h-12 rounded-full" style={{ backgroundColor: isSuccess ? '#00F2FF' : muted }} />
     }
   }
 
   const currentColor = isSuccess ? '#00F2FF' : color
+  const isDim = isFailed
 
   return (
     <motion.div
@@ -176,6 +178,18 @@ function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color:
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.8, type: 'spring', stiffness: 150 }}
     >
+      {/* 失败暗淡光晕 */}
+      {isFailed && (
+        <motion.div
+          className="absolute w-56 h-56 rounded-full"
+          style={{
+            background: `radial-gradient(circle, rgba(180,30,30,0.3) 0%, transparent 70%)`,
+          }}
+          animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.6, 0.4] }}
+          transition={{ duration: 2.5, repeat: Infinity }}
+        />
+      )}
+
       {/* 成功庆祝光芒 */}
       {isSuccess && (
         <>
@@ -212,45 +226,53 @@ function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color:
       <motion.div
         className="absolute w-40 h-40 rounded-full"
         style={{
-          border: `2px solid ${currentColor}30`,
-          boxShadow: `0 0 60px ${currentColor}20, inset 0 0 40px ${currentColor}10`,
+          border: `2px solid ${currentColor}${isDim ? '20' : '30'}`,
+          boxShadow: `0 0 60px ${currentColor}${isDim ? '10' : '20'}, inset 0 0 40px ${currentColor}${isDim ? '05' : '10'}`,
         }}
         animate={isSuccess ? {
           rotate: 360,
           scale: [1, 1.1, 1],
+        } : isFailed ? {
+          rotate: 360,
+          scale: [1, 0.95, 1],
+          opacity: [0.5, 0.7, 0.5],
         } : { rotate: 360 }}
-        transition={{ duration: isSuccess ? 8 : 20, repeat: Infinity, ease: 'linear' }}
+        transition={{ duration: isSuccess ? 8 : isFailed ? 20 : 20, repeat: Infinity, ease: 'linear' }}
       />
 
       {/* 中圈 */}
       <motion.div
         className="absolute w-32 h-32 rounded-full"
         style={{
-          border: `1px solid ${currentColor}40`,
-          boxShadow: `0 0 40px ${currentColor}30`,
+          border: `1px solid ${currentColor}${isDim ? '25' : '40'}`,
+          boxShadow: `0 0 40px ${currentColor}${isDim ? '10' : '30'}`,
         }}
-        animate={isSuccess ? { scale: [1, 1.15, 1] } : { scale: [1, 1.05, 1] }}
-        transition={{ duration: isSuccess ? 1 : 3, repeat: Infinity, ease: 'easeInOut' }}
+        animate={isSuccess ? { scale: [1, 1.15, 1] } : isFailed ? { scale: [0.95, 1, 0.95] } : { scale: [1, 1.05, 1] }}
+        transition={{ duration: isSuccess ? 1 : isFailed ? 4 : 3, repeat: Infinity, ease: 'easeInOut' }}
       />
 
       {/* 主图标 */}
       <motion.div
         className="relative z-10 w-24 h-24 rounded-full flex items-center justify-center"
         style={{
-          backgroundColor: `${currentColor}15`,
-          boxShadow: `0 0 50px ${currentColor}40, inset 0 0 30px ${currentColor}20`,
+          backgroundColor: `${currentColor}${isDim ? '08' : '15'}`,
+          boxShadow: `0 0 50px ${currentColor}${isDim ? '15' : '40'}, inset 0 0 30px ${currentColor}${isDim ? '08' : '20'}`,
         }}
         animate={isSuccess ? {
           y: [0, -20, 0, -10, 0],
           scale: [1, 1.1, 1, 1.05, 1],
+        } : isFailed ? {
+          y: [0, 5, 0],
+          scale: [1, 0.9, 1],
+          opacity: [0.6, 0.8, 0.6],
         } : { y: [0, -10, 0] }}
-        transition={{ duration: isSuccess ? 1.5 : 4, repeat: Infinity, ease: 'easeInOut' }}
+        transition={{ duration: isSuccess ? 1.5 : isFailed ? 3 : 4, repeat: Infinity, ease: 'easeInOut' }}
       >
         {getIcon()}
       </motion.div>
 
       {/* 类型特效 */}
-      {!isSuccess && type === '深空探索AI' && (
+      {!isSuccess && !isFailed && type === '深空探索AI' && (
         <div className="absolute w-48 h-48">
           {[...Array(8)].map((_, i) => (
             <motion.div
@@ -273,7 +295,7 @@ function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color:
         </div>
       )}
 
-      {!isSuccess && type === '货运飞船驾驶员' && (
+      {!isSuccess && !isFailed && type === '货运飞船驾驶员' && (
         <div className="absolute w-40 h-40">
           {[...Array(6)].map((_, i) => (
             <motion.div
@@ -296,7 +318,7 @@ function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color:
         </div>
       )}
 
-      {!isSuccess && type === '通讯中继站AI' && (
+      {!isSuccess && !isFailed && type === '通讯中继站AI' && (
         <div className="absolute w-48 h-48">
           {[...Array(3)].map((_, i) => (
             <motion.div
@@ -317,7 +339,7 @@ function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color:
         </div>
       )}
 
-      {!isSuccess && type === '艺术生成AI' && (
+      {!isSuccess && !isFailed && type === '艺术生成AI' && (
         <div className="absolute w-48 h-48">
           {['#FF6B9D', '#00F2FF', '#AA64FF', '#5EC0D8', '#FF8C00'].map((c, i) => (
             <motion.div
@@ -340,7 +362,7 @@ function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color:
         </div>
       )}
 
-      {!isSuccess && type === '冬眠宇航员' && (
+      {!isSuccess && !isFailed && type === '冬眠宇航员' && (
         <motion.div
           className="absolute w-44 h-44 rounded-full"
           style={{ backgroundColor: `${color}10` }}
@@ -353,17 +375,17 @@ function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color:
       <motion.div
         className="absolute mt-32 px-4 py-1.5 rounded-full text-[12px] font-mono whitespace-nowrap"
         style={{
-          backgroundColor: `${currentColor}20`,
-          color: currentColor,
-          border: `1px solid ${currentColor}40`,
-          textShadow: `0 0 10px ${currentColor}`,
-          boxShadow: `0 0 20px ${currentColor}30`,
+          backgroundColor: `${currentColor}${isFailed ? '15' : '20'}`,
+          color: isFailed ? '#888888' : currentColor,
+          border: `1px solid ${currentColor}${isFailed ? '25' : '40'}`,
+          textShadow: `0 0 10px ${currentColor}${isFailed ? '40' : ''}`,
+          boxShadow: `0 0 20px ${currentColor}${isFailed ? '15' : '30'}`,
         }}
         initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
+        animate={{ y: 0, opacity: isFailed ? 0.7 : 1 }}
         transition={{ delay: 0.5 }}
       >
-        {isSuccess ? `${name.split('"')[0]}已治愈!` : name}
+        {isSuccess ? `${name.split('"')[0]}已治愈!` : isFailed ? `${name.split('"')[0]}未能治愈...` : name}
       </motion.div>
     </motion.div>
   )
@@ -470,6 +492,18 @@ export function SpaceView() {
           color={npc.avatarColor}
           name={npc.name}
           isSuccess={phase === 'success'}
+          isFailed={phase === 'failed'}
+        />
+      )}
+
+      {/* 失败暗淡滤镜 */}
+      {phase === 'failed' && (
+        <motion.div
+          className="absolute inset-0 pointer-events-none z-20"
+          style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
         />
       )}
 
