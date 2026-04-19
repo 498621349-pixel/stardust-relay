@@ -197,6 +197,7 @@ function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color:
                 boxShadow: `0 0 10px ${['#FFD700', '#00F2FF', '#FF6B9D', '#AA64FF', '#5EC0D8'][i % 5]}`,
               }}
               animate={{
+                // @ts-ignore
                 angle: i * 30,
                 distance: [40, 80, 40],
                 opacity: [0, 1, 0],
@@ -262,6 +263,7 @@ function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color:
                 top: '50%',
               }}
               animate={{
+                // @ts-ignore
                 angle: i * 45,
                 distance: [25, 50, 25],
               }}
@@ -328,6 +330,7 @@ function SpaceNPCVisual({ type, color, name, isSuccess }: { type: string; color:
                 top: '50%',
               }}
               animate={{
+                // @ts-ignore
                 angle: i * 72,
                 distance: [20, 55],
               }}

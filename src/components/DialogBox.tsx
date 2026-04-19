@@ -11,7 +11,7 @@ export function DialogBox() {
   const speechEnabled = useGameStore((s) => s.speechEnabled)
   const npc = useGameStore((s) => s.npc)
 
-  const { speakIntro, speakDialogue, speak, stop, isSpeaking } = useSpeech()
+  const { speakIntro, speakDialogue, speak, stop } = useSpeech()
 
   const [displayedText, setDisplayedText] = useState('')
   const [currentIndex, setCurrentIndex] = useState(0)

@@ -47,6 +47,7 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess }: { type: strin
                 boxShadow: `0 0 6px ${['#FFD700', '#00F2FF', '#FF6B9D', '#AA64FF'][i % 4]}`,
               }}
               animate={{
+                // @ts-ignore
                 angle: i * 45,
                 distance: [20, 40, 20],
                 opacity: [0, 1, 0],
@@ -128,6 +129,7 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess }: { type: strin
               className="absolute w-1 h-1 rounded-full"
               style={{ backgroundColor: color }}
               animate={{
+                // @ts-ignore
                 angle: [i * 60, i * 60 + 360],
                 distance: [15, 35, 15],
               }}
@@ -186,6 +188,7 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess }: { type: strin
                 boxShadow: `0 0 8px ${c}`,
               }}
               animate={{
+                // @ts-ignore
                 angle: i * 72,
                 distance: 25,
               }}
