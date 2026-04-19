@@ -1,73 +1,55 @@
-# React + TypeScript + Vite
+# 星尘驿站 Stardust Relay
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**👉 现在就开始玩：https://stardust-relay.vercel.app**
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+如果你也曾在深夜仰望星空，想象那些遥远光点背后藏着什么故事——这个游戏就是为你写的。
 
-## React Compiler
+在深空轨道的某个角落，你是一座古老中转站的调度员。每天都有迷途的飞船、AI、和沉睡的宇航员造访，他们各自带着不同的困境而来——逻辑过载、情绪冻结、孤独循环……而你的任务，是为他们调制一杯恰到好处的特饮。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 游戏特色
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**5位性格迥异的访客**
+冷静的深空探索AI、热情的货运飞行员、困在循环里的通讯中继站、冬眠太久忘记自己名字的宇航员、失去色彩感知的艺术AI——每一段相遇都有专属的故事和声音。
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**语音播报沉浸体验**
+访客到来时的描述、治愈后的反馈，都有声音陪伴。中文女声旁白让文字不再是独自阅读。
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+**视觉氛围感极强**
+流星划过、星云缓慢呼吸、行星静静漂浮，深空的孤独与美都被细节呈现。成功治愈时的粒子庆祝效果、失败时的暗淡滤镜——情绪随画面流动。
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+**简单的逻辑谜题**
+用三张逻辑卡片调出正确参数，考验的是理解与直觉，不是记忆。每次解谜都有提示，但你也可以凭感觉尝试。
+
+**资源管理与策略**
+节能还是超载？买自动化小球还是解锁宏指令？每一次选择都有代价——能源耗尽，驿站就会永久休眠。
+
+---
+
+## 设计初衷
+
+星尘驿站想探讨的是**「被需要的感觉」**。
+
+这些访客不是NPC，是漂泊者。货运飞船在无止境的航行中燃烧殆尽，AI在无尽的循环里忘记了自己想说什么，冬眠宇航员的意识锚定在虚无中——他们需要的不是拯救世界的大英雄，只是一杯温度刚好的热饮，和一句"我听见你了"。
+
+而你，作为调度员，做的最重要的事不是算对参数，而是**让他们感到自己被看见了**。
+
+---
+
+## 技术栈
+
+React + TypeScript + Vite + TailwindCSS + Framer Motion + Zustand + Web Speech API
+
+## 本地运行
+
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+*星尘驿站在轨道上稳定运行。深空很安静……等待下一个信号。*
