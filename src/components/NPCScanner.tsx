@@ -3,21 +3,23 @@ import { Activity, Brain, Thermometer, CheckCircle, XCircle, Lightbulb, Snowflak
 import { useGameStore } from '../store/gameStore'
 
 // NPC 可视化组件
-function NPCVisual({ type, color, currentE, currentP, isSuccess }: { type: string; color: string; currentE: number; currentP: number; isSuccess?: boolean }) {
+function NPCVisual({ type, color, currentE, currentP, isSuccess, isFailed }: { type: string; color: string; currentE: number; currentP: number; isSuccess?: boolean; isFailed?: boolean }) {
   const successColor = '#00F2FF'
-  const currentColor = isSuccess ? successColor : color
+  const failedColor = '#888888'
+  const currentColor = isSuccess ? successColor : (isFailed ? failedColor : color)
+  const isDim = isFailed
 
   const getIcon = () => {
     if (isSuccess) {
       return <CheckCircle size={40} style={{ color: successColor }} />
     }
     switch (type) {
-      case '深空探索AI': return <Snowflake size={40} style={{ color }} />
-      case '货运飞船驾驶员': return <Flame size={40} style={{ color }} />
-      case '通讯中继站AI': return <Radio size={40} style={{ color }} />
-      case '冬眠宇航员': return <User size={40} style={{ color }} />
-      case '艺术生成AI': return <Palette size={40} style={{ color }} />
-      default: return <Brain size={40} style={{ color }} />
+      case '深空探索AI': return <Snowflake size={40} style={{ color: isDim ? failedColor : color }} />
+      case '货运飞船驾驶员': return <Flame size={40} style={{ color: isDim ? failedColor : color }} />
+      case '通讯中继站AI': return <Radio size={40} style={{ color: isDim ? failedColor : color }} />
+      case '冬眠宇航员': return <User size={40} style={{ color: isDim ? failedColor : color }} />
+      case '艺术生成AI': return <Palette size={40} style={{ color: isDim ? failedColor : color }} />
+      default: return <Brain size={40} style={{ color: isDim ? failedColor : color }} />
     }
   }
 
@@ -62,39 +64,49 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess }: { type: strin
       <motion.div
         className="absolute inset-0 rounded-full border-2"
         style={{
-          borderColor: isSuccess ? `${successColor}60` : `${color}40`,
-          borderStyle: isSuccess ? 'solid' : 'dashed'
+          borderColor: isDim ? `${failedColor}20` : (isSuccess ? `${successColor}60` : `${color}40`),
+          borderStyle: isDim ? 'dotted' : (isSuccess ? 'solid' : 'dashed')
         }}
-        animate={{ rotate: 360, scale: isSuccess ? [1, 1.05, 1] : 1 }}
-        transition={{ duration: isSuccess ? 3 : 8, repeat: Infinity, ease: 'linear' }}
+        animate={isDim ? { rotate: 360, scale: [1, 0.95, 1], opacity: [0.4, 0.6, 0.4] } : (isSuccess ? { rotate: 360, scale: [1, 1.05, 1] } : { rotate: 360 })}
+        transition={{ duration: isDim ? 15 : (isSuccess ? 3 : 8), repeat: Infinity, ease: 'linear' }}
       />
+
+      {/* 失败暗淡光晕 */}
+      {isFailed && (
+        <motion.div
+          className="absolute inset-0 rounded-full"
+          style={{ backgroundColor: 'rgba(180,30,30,0.15)' }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
+      )}
 
       {/* 中圈 - 根据逻辑缺损脉动 */}
       <motion.div
         className="absolute inset-2 rounded-full border"
         style={{
-          borderColor: isSuccess ? `${successColor}60` : `${color}60`,
-          boxShadow: `0 0 ${isSuccess ? 30 : 20 + currentP * 30}px ${isSuccess ? successColor : color}30`,
+          borderColor: isDim ? `${failedColor}25` : (isSuccess ? `${successColor}60` : `${color}60`),
+          boxShadow: `0 0 ${isDim ? 10 : (isSuccess ? 30 : 20 + currentP * 30)}px ${isDim ? failedColor : (isSuccess ? successColor : color)}${isDim ? '15' : '30'}`,
         }}
-        animate={{ scale: [1, isSuccess ? 1.1 : 1 + currentP * 0.1, 1] }}
-        transition={{ duration: isSuccess ? 1 : 2, repeat: Infinity, ease: 'easeInOut' }}
+        animate={isDim ? { scale: [0.95, 1, 0.95] } : (isSuccess ? { scale: [1, 1.1, 1] } : { scale: [1, 1 + currentP * 0.1, 1] })}
+        transition={{ duration: isDim ? 4 : (isSuccess ? 1 : 2), repeat: Infinity, ease: 'easeInOut' }}
       />
 
       {/* 内圈 - 主图标 */}
       <motion.div
         className="absolute inset-4 rounded-full flex items-center justify-center"
         style={{
-          backgroundColor: `${currentColor}15`,
-          boxShadow: `0 0 30px ${currentColor}40, inset 0 0 20px ${currentColor}20`,
+          backgroundColor: `${currentColor}${isDim ? '08' : '15'}`,
+          boxShadow: `0 0 30px ${currentColor}${isDim ? '15' : '40'}, inset 0 0 20px ${currentColor}${isDim ? '08' : '20'}`,
         }}
-        animate={isSuccess ? { y: [0, -5, 0] } : {}}
-        transition={{ duration: isSuccess ? 1 : 0, repeat: isSuccess ? Infinity : 0 }}
+        animate={isDim ? { y: [0, 3, 0], scale: [1, 0.9, 1] } : (isSuccess ? { y: [0, -5, 0] } : {})}
+        transition={{ duration: isDim ? 3 : (isSuccess ? 1 : 0), repeat: Infinity }}
       >
         {getIcon()}
       </motion.div>
 
-      {/* 扫描线 - 非成功状态 */}
-      {!isSuccess && (
+      {/* 扫描线 - 非成功非失败状态 */}
+      {!isSuccess && !isFailed && (
         <motion.div
           className="absolute left-0 right-0 h-0.5"
           style={{
@@ -110,18 +122,18 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess }: { type: strin
       <motion.div
         className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-mono"
         style={{
-          backgroundColor: `${currentColor}30`,
+          backgroundColor: `${currentColor}${isDim ? '20' : '30'}`,
           color: currentColor,
-          border: `1px solid ${currentColor}50`,
+          border: `1px solid ${currentColor}${isDim ? '25' : '50'}`,
         }}
-        animate={isSuccess ? { scale: [1, 1.1, 1] } : { opacity: [0.7, 1, 0.7] }}
-        transition={{ duration: isSuccess ? 0.8 : 2, repeat: isSuccess ? Infinity : Infinity }}
+        animate={isDim ? { opacity: [0.5, 0.7, 0.5] } : (isSuccess ? { scale: [1, 1.1, 1] } : { opacity: [0.7, 1, 0.7] })}
+        transition={{ duration: isDim ? 3 : (isSuccess ? 0.8 : 2), repeat: Infinity }}
       >
-        {isSuccess ? '已治愈!' : `E: ${(currentE * 100).toFixed(0)}%`}
+        {isSuccess ? '已治愈!' : isFailed ? '未治愈' : `E: ${(currentE * 100).toFixed(0)}%`}
       </motion.div>
 
-      {/* 粒子效果 - 非成功状态 */}
-      {!isSuccess && type === '深空探索AI' && (
+      {/* 粒子效果 - 非成功非失败状态 */}
+      {!isSuccess && !isFailed && type === '深空探索AI' && (
         <div className="absolute inset-0">
           {[...Array(6)].map((_, i) => (
             <motion.div
@@ -139,7 +151,7 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess }: { type: strin
         </div>
       )}
 
-      {!isSuccess && type === '货运飞船驾驶员' && (
+      {!isSuccess && !isFailed && type === '货运飞船驾驶员' && (
         <div className="absolute inset-0">
           {[...Array(4)].map((_, i) => (
             <motion.div
@@ -157,7 +169,7 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess }: { type: strin
         </div>
       )}
 
-      {!isSuccess && type === '通讯中继站AI' && (
+      {!isSuccess && !isFailed && type === '通讯中继站AI' && (
         <div className="absolute inset-0">
           {[...Array(3)].map((_, i) => (
             <motion.div
@@ -177,7 +189,7 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess }: { type: strin
         </div>
       )}
 
-      {!isSuccess && type === '艺术生成AI' && (
+      {!isSuccess && !isFailed && type === '艺术生成AI' && (
         <div className="absolute inset-0">
           {['#FF6B9D', '#00F2FF', '#AA64FF', '#5EC0D8', '#FF8C00'].map((c, i) => (
             <motion.div
@@ -198,7 +210,7 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess }: { type: strin
         </div>
       )}
 
-      {!isSuccess && type === '冬眠宇航员' && (
+      {!isSuccess && !isFailed && type === '冬眠宇航员' && (
         <motion.div
           className="absolute inset-0 rounded-full"
           style={{ backgroundColor: `${color}10` }}
@@ -234,7 +246,17 @@ export function NPCScanner() {
   }
 
   return (
-    <div className="bg-panel-bg backdrop-blur-md border border-panel-border rounded-lg p-5 glow-border h-full flex flex-col">
+    <div className="bg-panel-bg backdrop-blur-md border border-panel-border rounded-lg p-5 glow-border h-full flex flex-col relative">
+      {/* 失败暗淡背景滤镜 */}
+      {isFailed && (
+        <motion.div
+          className="absolute inset-0 rounded-lg pointer-events-none z-10"
+          style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        />
+      )}
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-[13px] tracking-[0.15em] text-cyan-glow/70 uppercase font-mono glow-text">
           访客扫描仪
@@ -284,6 +306,7 @@ export function NPCScanner() {
               currentE={npc.currentE}
               currentP={npc.currentP}
               isSuccess={isSuccess}
+              isFailed={isFailed}
             />
 
             {/* NPC Info */}
