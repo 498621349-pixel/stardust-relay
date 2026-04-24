@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { Activity, Brain, Thermometer, CheckCircle, XCircle, Lightbulb, Snowflake, Flame, Radio, User, Palette, BookOpen } from 'lucide-react'
+import { Activity, Brain, Thermometer, CheckCircle, XCircle, Lightbulb, Snowflake, Flame, Radio, User, Palette, Rocket, Zap, Heart, BookOpen } from 'lucide-react'
 import { useGameStore } from '../store/gameStore'
 import { getAffectionTier } from '../store/gamePersist'
 import { useState } from 'react'
@@ -20,6 +20,10 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess, isFailed }: { t
       case '通讯中继站AI': return <Radio size={40} style={{ color: isDim ? failedColor : color }} />
       case '冬眠宇航员': return <User size={40} style={{ color: isDim ? failedColor : color }} />
       case '艺术生成AI': return <Palette size={40} style={{ color: isDim ? failedColor : color }} />
+      case '量子观测AI': return <Zap size={40} style={{ color: isDim ? failedColor : color }} />
+      case '远航船幼儿': return <Rocket size={40} style={{ color: isDim ? failedColor : color }} />
+      case '古老广播站AI': return <Radio size={40} style={{ color: isDim ? failedColor : color }} />
+      case '医疗舱AI': return <Heart size={40} style={{ color: isDim ? failedColor : color }} />
       default: return <Brain size={40} style={{ color: isDim ? failedColor : color }} />
     }
   }
@@ -37,15 +41,30 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess, isFailed }: { t
             animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }}
             transition={{ duration: 1.5, repeat: Infinity }}
           />
-          {[...Array(8)].map((_, i) => (
-            <motion.div
-              key={`celeb-${i}`} className="absolute w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: ['#FFD700', '#00F2FF', '#FF6B9D', '#AA64FF'][i % 4], boxShadow: `0 0 6px ${['#FFD700', '#00F2FF', '#FF6B9D', '#AA64FF'][i % 4]}` }}
-              animate={{ // @ts-ignore
-                angle: i * 45, distance: [20, 40, 20], opacity: [0, 1, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
-            />
-          ))}
+          {[...Array(8)].map((_, i) => {
+            const angleRad = (i * 45 * Math.PI) / 180
+            const cos = Math.cos(angleRad)
+            const sin = Math.sin(angleRad)
+            const particleColor = ['#FFD700', '#00F2FF', '#FF6B9D', '#AA64FF'][i % 4]
+            // Keyframe positions: orbit from 20px to 40px radius at the given angle
+            const x0 = `${50 + 20 * cos}px`
+            const x1 = `${50 + 40 * cos}px`
+            const y0 = `${50 + 20 * sin}px`
+            const y1 = `${50 + 40 * sin}px`
+            return (
+              <motion.div
+                key={`celeb-${i}`}
+                className="absolute w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: particleColor, boxShadow: `0 0 6px ${particleColor}` }}
+                animate={{
+                  x: [x0, x1, x0],
+                  y: [y0, y1, y0],
+                  opacity: [0, 1, 0],
+                }}
+                transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
+              />
+            )
+          })}
         </>
       )}
       <motion.div className="absolute inset-0 rounded-full border-2"

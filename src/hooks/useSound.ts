@@ -201,7 +201,7 @@ function playFail(ctx: AudioContext, now: number) {
   })
 }
 
-/** 游戏结束：低沉的延音，像深空回响 */
+/** 紧急警报：双音急促脉冲，用正弦波保持温暖基调 */
 function playEmergencyCritical(ctx: AudioContext, now: number) {
   // 急促的双音警报，2 次
   for (let i = 0; i < 2; i++) {
@@ -210,16 +210,16 @@ function playEmergencyCritical(ctx: AudioContext, now: number) {
     osc.connect(gain)
     gain.connect(ctx.destination)
 
-    osc.type = 'square'
-    osc.frequency.setValueAtTime(880, now + i * 0.2)
-    osc.frequency.setValueAtTime(660, now + i * 0.2 + 0.1)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(880, now + i * 0.22)
+    osc.frequency.setValueAtTime(660, now + i * 0.22 + 0.11)
 
-    gain.gain.setValueAtTime(0, now + i * 0.2)
-    gain.gain.linearRampToValueAtTime(0.1, now + i * 0.2 + 0.01)
-    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.2 + 0.15)
+    gain.gain.setValueAtTime(0, now + i * 0.22)
+    gain.gain.linearRampToValueAtTime(0.12, now + i * 0.22 + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.22 + 0.16)
 
-    osc.start(now + i * 0.2)
-    osc.stop(now + i * 0.2 + 0.15)
+    osc.start(now + i * 0.22)
+    osc.stop(now + i * 0.22 + 0.16)
   }
 }
 

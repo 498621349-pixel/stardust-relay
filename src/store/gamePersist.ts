@@ -34,6 +34,10 @@ export interface PersistedGameData {
   bgmVolume?: number
   achievements?: AchievementsState
   streak?: number
+  // 访客恢复（仅 arrived/mixing 阶段有值，其他阶段为 null）
+  phase?: 'arrived' | 'mixing'
+  npc?: { id: string; name: string; type: string; avatarColor: string; targetX: number; targetY: number; targetZ: number; currentE: number; currentP: number; intro: string; successLines: string[]; failLines: string[] } | null
+  slots?: (string | null)[]
 }
 
 export interface MacroData {
@@ -114,7 +118,7 @@ export function checkAchievements(
   const { unlocked } = prev
   const newlyUnlocked: AchievementId[] = []
 
-  const allNpcIds = ['frost', 'ember', 'echo', 'anchor', 'prism']
+  const allNpcIds = ['frost', 'ember', 'echo', 'anchor', 'prism', 'void', 'drift', 'echo2', 'watcher']
   const hasAllVisitors = allNpcIds.every(id => (state.npcStats[id]?.successCount ?? 0) >= 1)
   const hasTrustAny = allNpcIds.some(id => (state.npcStats[id]?.successCount ?? 0) >= 5)
 
@@ -220,6 +224,9 @@ function defaultData(): PersistedGameData {
     isResting: false,
     achievements: defaultAchievements(),
     streak: 0,
+    phase: undefined,
+    npc: undefined,
+    slots: undefined,
   }
 }
 

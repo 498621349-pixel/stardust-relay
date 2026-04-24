@@ -3,7 +3,7 @@ import { useGameStore } from '../store/gameStore'
 
 /**
  * 游戏键盘快捷键
- * Space   - 扫描信号（idle/emergency 状态）
+ * Space   - 扫描信号（idle 状态）
  * Enter   - 开始调制（arrived/mixing 状态）
  * R       - 重置卡片槽（arrived/mixing 状态）
  * Escape  - 切换休息模式
@@ -22,7 +22,7 @@ export function useKeyboardShortcuts() {
       switch (e.code) {
         case 'Space': {
           e.preventDefault()
-          if (state.phase === 'idle' || state.phase === 'emergency') {
+          if (state.phase === 'idle') {
             state.startArrival()
           }
           break

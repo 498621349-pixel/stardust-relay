@@ -6,48 +6,50 @@ import { loadGame, saveGame, clearGame, type PersistedGameData, type MacroData, 
 // 加载存档（不存在时用默认）
 const savedData = loadGame()
 
-// 初始状态由存档决定，但访客/对话框等瞬时状态始终从默认值开始
-const initialState = {
-  phase: 'idle' as const,
-  resources: savedData.resources,
-  npc: null,
-  slots: [null, null, null] as (string | null)[],
-  mode: savedData.mode,
-  score: savedData.score,
-  servedCount: savedData.servedCount,
-  day: savedData.day,
-  dialogText: '深空很安静... 星尘驿站在轨道上稳定运行。系统待机中，等待下一个信号。',
-  dialogSpeaker: 'SYSTEM // 星尘驿站',
-  resultParams: null,
-  autoCollectors: savedData.autoCollectors,
-  macroUnlocked: savedData.macroUnlocked,
-  logs: [{ time: nowTime(), message: '系统启动完成。星尘驿站在线。', type: 'info' as const }],
-  scanProgress: 0,
-  brewProgress: 0,
-  speechEnabled: savedData.speechEnabled,
-  isResting: savedData.isResting,
-  soundEnabled: savedData.soundEnabled,
-  macros: savedData.macros,
-  npcStats: savedData.npcStats ?? {},
-  bgmEnabled: savedData.bgmEnabled ?? false,
-  bgmVolume: savedData.bgmVolume ?? 0.18,
-  achievements: savedData.achievements ?? { unlocked: [], justUnlocked: null },
-  streak: savedData.streak ?? 0,
-}
-
-// 读取存档后给出提示
-if (savedData.score > 0 || savedData.servedCount > 0) {
-  const savedDate = new Date(savedData.savedAt)
-  const timeStr = `${savedDate.getMonth() + 1}月${savedDate.getDate()}日 ${savedDate.getHours().toString().padStart(2, '0')}:${savedDate.getMinutes().toString().padStart(2, '0')}`
-  const idx = initialState.logs.findIndex(l => l.message === '系统启动完成。星尘驿站在线。')
-  if (idx !== -1) {
-    initialState.logs.splice(idx, 0, {
+// 访客恢复：仅在 arrived/mixing 阶段恢复访客状态
+function buildInitialData() {
+  const isRecovering = savedData.phase === 'arrived' || savedData.phase === 'mixing'
+  const logs = [{ time: nowTime(), message: '系统启动完成。星尘驿站在线。', type: 'info' as const }]
+  if (savedData.score > 0 || savedData.servedCount > 0) {
+    const savedDate = new Date(savedData.savedAt)
+    const timeStr = `${savedDate.getMonth() + 1}月${savedDate.getDate()}日 ${savedDate.getHours().toString().padStart(2, '0')}:${savedDate.getMinutes().toString().padStart(2, '0')}`
+    logs.unshift({
       time: nowTime(),
       message: `存档已加载。上次游玩：${timeStr} | 积分：${savedData.score} | 第${savedData.day}天`,
       type: 'info' as const,
     })
   }
+  return {
+    phase: (isRecovering ? savedData.phase : 'idle') as GamePhase,
+    resources: savedData.resources,
+    npc: isRecovering ? (savedData.npc ?? null) : null,
+    slots: isRecovering && savedData.slots ? savedData.slots : [null, null, null],
+    mode: savedData.mode,
+    score: savedData.score,
+    servedCount: savedData.servedCount,
+    day: savedData.day,
+    dialogText: isRecovering
+      ? `检测到未完成接待，访客信息已恢复。请继续为 ${savedData.npc?.name ?? '访客'} 调制饮品。`
+      : '深空很安静... 星尘驿站在轨道上稳定运行。系统待机中，等待下一个信号。',
+    dialogSpeaker: 'SYSTEM // 星尘驿站',
+    resultParams: null,
+    autoCollectors: savedData.autoCollectors,
+    macroUnlocked: savedData.macroUnlocked,
+    logs,
+    scanProgress: 0,
+    brewProgress: 0,
+    speechEnabled: savedData.speechEnabled,
+    isResting: savedData.isResting,
+    soundEnabled: savedData.soundEnabled,
+    macros: savedData.macros,
+    npcStats: savedData.npcStats ?? {},
+    bgmEnabled: savedData.bgmEnabled ?? false,
+    bgmVolume: savedData.bgmVolume ?? 0.18,
+    achievements: savedData.achievements ?? { unlocked: [], justUnlocked: null },
+    streak: savedData.streak ?? 0,
+  }
 }
+const initialData = buildInitialData()
 
 // 抽出需要持久化的状态片段（导出供 main.tsx 全局保存使用）
 export function toPersistedData(state: GameState): PersistedGameData {
@@ -70,6 +72,10 @@ export function toPersistedData(state: GameState): PersistedGameData {
     bgmVolume: state.bgmVolume,
     achievements: state.achievements,
     streak: state.streak,
+    // 仅在 arrived/mixing 阶段保存访客信息（其他阶段均为 null/idle）
+    phase: (state.phase === 'arrived' || state.phase === 'mixing') ? state.phase : undefined,
+    npc: (state.phase === 'arrived' || state.phase === 'mixing') ? state.npc : undefined,
+    slots: (state.phase === 'arrived' || state.phase === 'mixing') ? state.slots : undefined,
   }
 }
 
@@ -167,10 +173,10 @@ function nowTime(): string {
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
 }
 
-export const useGameStore = create<GameState>((set, get) => ({
-  ...initialState,
-
-  tick: () => {
+export const useGameStore = create<GameState>()((set, get) =>
+  ({
+    ...initialData,
+    tick: () => {
     const state = get()
     if (state.phase === 'gameover') {
       autoSave(state)
@@ -189,6 +195,24 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     // ===== 以下处理不受休息影响 =====
+    // 进入紧急状态（能源 < 5%，仅在非 emergency/gameover 时触发一次）
+    if (
+      !state.isResting &&
+      state.phase !== 'emergency' &&
+      // @ts-expect-error Zustand infers narrower state type; gameover/emergency are valid
+      state.phase !== 'gameover' &&
+      newEnergy < 5
+    ) {
+      set({
+        phase: 'emergency',
+        dialogText: '⚠ 警告：能源储备告急。系统进入紧急模式。请切换至节能模式等待能源恢复。',
+        dialogSpeaker: 'SYSTEM // 星尘驿站',
+        resources: { energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
+      })
+      get().addLog('⚠ 能源告急，进入紧急模式！', 'error')
+      return
+    }
+
     // 紧急状态恢复（仅在非休息时生效）
     if (!state.isResting && state.phase === 'emergency' && newEnergy > 20) {
       set({
@@ -627,7 +651,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 // 统一存档监听：关键字段变化时自动触发存档，替代散落的 autoSave(get()) 调用
 useGameStore.subscribe((state, prev) => {
   const changed = (k: string) => JSON.stringify(state[k as keyof typeof state]) !== JSON.stringify(prev[k as keyof typeof prev])
-  if (['resources', 'achievements', 'npcStats', 'macros', 'mode'].some(changed)) {
+  if (['resources', 'achievements', 'npcStats', 'macros', 'mode', 'npc', 'slots', 'phase'].some(changed)) {
     saveGame(toPersistedData(state))
   }
 })

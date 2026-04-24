@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState, useRef } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useSpeech } from '../hooks/useSpeech'
+import { useSound } from '../hooks/useSound'
 
 export function DialogBox() {
   const dialogText = useGameStore((s) => s.dialogText)
@@ -10,8 +11,10 @@ export function DialogBox() {
   const resources = useGameStore((s) => s.resources)
   const speechEnabled = useGameStore((s) => s.speechEnabled)
   const npc = useGameStore((s) => s.npc)
+  const soundEnabled = useGameStore((s) => s.soundEnabled)
 
   const { speakIntro, speakDialogue, speak, stop } = useSpeech()
+  const { play: playSound } = useSound()
 
   const [displayedText, setDisplayedText] = useState('')
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -157,6 +160,14 @@ export function DialogBox() {
       }, 100)
     }
   }, [phase, stop])
+
+  // 紧急状态进入时触发音效
+  useEffect(() => {
+    if (prevPhaseRef.current !== 'emergency' && phase === 'emergency' && soundEnabled) {
+      playSound('emergency_critical')
+    }
+    prevPhaseRef.current = phase
+  }, [phase, soundEnabled, playSound])
 
   const isEmergency = phase === 'emergency'
   const isGameOver = phase === 'gameover'
