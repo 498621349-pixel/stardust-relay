@@ -1,19 +1,19 @@
 import { useCallback, useRef, useEffect } from 'react'
 
-// 语音参数配置 - 优化为更自然的语速和音调
+// 语音参数配置
 interface VoiceConfig {
-  rate: number  // 语速 0.1 - 10，推荐 0.8-1.3
-  pitch: number // 音调 0 - 2，推荐 0.9-1.3
-  volume: number // 音量 0-1
+  rate: number
+  pitch: number
+  volume: number
 }
 
 const VOICE_CONFIGS: Record<string, VoiceConfig> = {
-  narrator: { rate: 1.05, pitch: 1.1, volume: 1 },   // 旁白 - 自然流畅
-  frost: { rate: 0.95, pitch: 0.95, volume: 1 },      // 深空探索AI - 冷静理性，略低
-  ember: { rate: 1.15, pitch: 1.25, volume: 1 },      // 货运飞船驾驶员 - 热情活力，略高
-  echo: { rate: 1.0, pitch: 1.05, volume: 1 },         // 通讯中继站AI - 平稳清晰
-  anchor: { rate: 0.9, pitch: 0.85, volume: 1 },     // 冬眠宇航员 - 缓慢低沉
-  prism: { rate: 1.1, pitch: 1.2, volume: 1 },         // 艺术生成AI - 活泼跳跃
+  narrator: { rate: 1.1, pitch: 1.15, volume: 1 },
+  frost:    { rate: 1.0,  pitch: 1.0,  volume: 1 },
+  ember:    { rate: 1.15, pitch: 1.3,  volume: 1 },
+  echo:     { rate: 1.05, pitch: 1.1,  volume: 1 },
+  anchor:   { rate: 0.9,  pitch: 0.9,  volume: 1 },
+  prism:    { rate: 1.15, pitch: 1.25, volume: 1 },
 }
 
 export function useSpeech() {
@@ -22,15 +22,59 @@ export function useSpeech() {
   const voicesRef = useRef<SpeechSynthesisVoice[]>([])
   const pendingSpeechRef = useRef<{ text: string; voiceType: string } | null>(null)
 
+  // 从语音列表中挑选最优女声
+  function selectBestChineseVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+    if (voices.length === 0) return null
+
+    // macOS 中文女声名称列表（优先级从高到低）
+    const femaleVoiceNames = [
+      'tingting', 'sandy', 'shelley', 'flo', 'meijia', 'ting-ting', 'tingting',
+      'yu-shu', 'yushu', 'kankyo', 'lin lin',
+    ]
+    const isLikelyMale = (name: string) => {
+      const n = name.toLowerCase()
+      return n.includes('male') || n.includes('男') || n.includes('eddy') ||
+             n.includes('daniel') || n.includes('yannick') || n.includes('markus') ||
+             n.includes('helena') || n.includes('reed') || n.includes('rocko') ||
+             n.includes('grandpa') || n.includes('sinji')
+    }
+
+    // 优先级1: 本地 macOS 中文女声
+    let v = voices.find(vo => vo.lang.includes('zh') && vo.localService && !isLikelyMale(vo.name))
+    if (v) return v
+
+    // 优先级2: 明确指定的女声名称（tingting/sandy等）
+    for (const fn of femaleVoiceNames) {
+      v = voices.find(vo => vo.name.toLowerCase().includes(fn) && vo.lang.includes('zh'))
+      if (v) return v
+    }
+
+    // 优先级3: Google 中文女声
+    v = voices.find(vo => vo.name.toLowerCase().includes('google') && vo.lang.includes('zh') && !isLikelyMale(vo.name))
+    if (v) return v
+
+    // 优先级4: Microsoft 中文女声
+    v = voices.find(vo => vo.name.toLowerCase().includes('microsoft') && vo.lang.includes('zh') && !isLikelyMale(vo.name))
+    if (v) return v
+
+    // 优先级5: 任何中文语音（非男声）
+    v = voices.find(vo => vo.lang.includes('zh') && !isLikelyMale(vo.name))
+    if (v) return v
+
+    // 优先级6: 任何中文语音
+    v = voices.find(vo => vo.lang.includes('zh'))
+    if (v) return v
+
+    // 优先级7: 默认语音
+    return voices.find(vo => vo.default) || voices[0]
+  }
+
   // 内部执行朗读
   const doSpeak = useCallback((text: string, voiceType: string) => {
     if (!synthRef.current) return
     synthRef.current.cancel()
 
-    const voices = voicesRef.current
-    let selectedVoice = voices.find(v => v.lang.includes('zh') && v.localService)
-    if (!selectedVoice) selectedVoice = voices.find(v => v.lang.includes('zh'))
-    if (!selectedVoice) selectedVoice = voices.find(v => v.default) || voices[0]
+    const selectedVoice = selectBestChineseVoice(voicesRef.current)
 
     const utterance = new SpeechSynthesisUtterance(text)
     const config = VOICE_CONFIGS[voiceType] || VOICE_CONFIGS.narrator
@@ -56,7 +100,6 @@ export function useSpeech() {
       const loadVoices = () => {
         const voices = synthRef.current?.getVoices() || []
         voicesRef.current = voices
-        // 语音列表加载好后，如果有待处理的朗读，立即执行
         if (pendingSpeechRef.current && voices.length > 0) {
           const { text, voiceType } = pendingSpeechRef.current
           pendingSpeechRef.current = null
@@ -68,7 +111,7 @@ export function useSpeech() {
 
       if (synthRef.current && synthRef.current.getVoices().length === 0) {
         synthRef.current.addEventListener('voiceschanged', loadVoices)
-        setTimeout(() => { loadVoices() }, 200)
+        setTimeout(() => { loadVoices() }, 300)
       }
 
       return () => {
@@ -89,7 +132,6 @@ export function useSpeech() {
   // 朗读文本
   const speak = useCallback((text: string, voiceType: string = 'narrator') => {
     if (!synthRef.current) return
-    // 如果语音列表还没加载，缓存本次朗读请求，等加载好再执行
     if (voicesRef.current.length === 0) {
       pendingSpeechRef.current = { text, voiceType }
       return
@@ -97,17 +139,14 @@ export function useSpeech() {
     doSpeak(text, voiceType)
   }, [doSpeak])
 
-  // 检查是否正在朗读
   const isSpeaking = useCallback(() => {
     return isSpeakingRef.current
   }, [])
 
-  // 朗读旁白（访客介绍）
   const speakIntro = useCallback((text: string) => {
     speak(text, 'narrator')
   }, [speak])
 
-  // 朗读角色台词
   const speakDialogue = useCallback((npcId: string, text: string) => {
     speak(text, npcId)
   }, [speak])

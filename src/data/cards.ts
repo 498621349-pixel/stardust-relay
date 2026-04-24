@@ -48,6 +48,26 @@ export const LOGIC_CARDS: LogicCard[] = [
       return { x: avg, y: avg, z: avg }
     },
   },
+  {
+    id: 'phase',
+    name: '[相位]',
+    desc: 'Phase',
+    color: '#0AC8B9',
+    effect: 'X↔Z互换',
+    apply: (p) => ({ x: p.z, y: p.y, z: p.x }),
+  },
+  {
+    id: 'quake',
+    name: '[震荡]',
+    desc: 'Quake',
+    color: '#D4A017',
+    effect: '回摆 50%',
+    apply: (p) => ({
+      x: p.x + (0.5 - p.x) * 0.5,
+      y: p.y + (0.5 - p.y) * 0.5,
+      z: p.z + (0.5 - p.z) * 0.5,
+    }),
+  },
 ]
 
 export function calculateResult(
@@ -73,7 +93,8 @@ export function calculateResult(
 
 export function checkSuccess(
   result: { x: number; y: number; z: number },
-  target: { x: number; y: number; z: number }
+  target: { x: number; y: number; z: number },
+  tolerance: number = 0.30
 ): { success: boolean; errors: { x: number; y: number; z: number } } {
   const errors = {
     x: Math.abs(result.x - target.x) / target.x,
@@ -81,6 +102,30 @@ export function checkSuccess(
     z: Math.abs(result.z - target.z) / target.z,
   }
 
-  const success = errors.x <= 0.30 && errors.y <= 0.30 && errors.z <= 0.30
+  const success = errors.x <= tolerance && errors.y <= tolerance && errors.z <= tolerance
   return { success, errors }
+}
+
+/**
+ * 根据 day 数获取难度容差（±30% → ±20%）
+ * day 1-5:  35%  (新手友好)
+ * day 6-15: 30%  (默认)
+ * day 16-30: 25%
+ * day 31+:  20%  (硬核)
+ */
+export function getTolerance(day: number): number {
+  if (day <= 5) return 0.35
+  if (day <= 15) return 0.30
+  if (day <= 30) return 0.25
+  return 0.20
+}
+
+/**
+ * 根据 day 数获取访客到来概率（每 tick）
+ */
+export function getArrivalProbability(day: number): number {
+  if (day <= 5) return 0.002
+  if (day <= 15) return 0.003
+  if (day <= 30) return 0.004
+  return 0.006
 }

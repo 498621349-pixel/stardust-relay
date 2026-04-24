@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion'
-import { useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useMemo, useState, useEffect } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { ScanLine, Radio, Snowflake, Flame, Radio as RadioIcon, User, Palette } from 'lucide-react'
 
@@ -396,6 +396,14 @@ export function SpaceView() {
   const scanProgress = useGameStore((s) => s.scanProgress)
   const startArrival = useGameStore((s) => s.startArrival)
   const npc = useGameStore((s) => s.npc)
+  const [showHint, setShowHint] = useState(true)
+
+  // 首次扫描后隐藏提示
+  useEffect(() => {
+    if (phase === 'scanning' || phase === 'arrived') {
+      setShowHint(false)
+    }
+  }, [phase])
 
   const stars = useMemo(() =>
     Array.from({ length: 80 }, () => {
@@ -527,6 +535,30 @@ export function SpaceView() {
           <div className="text-[12px] text-text-secondary font-mono mt-2">{scanProgress.toFixed(0)}%</div>
         </motion.div>
       )}
+
+      {/* 新手提示 */}
+      <AnimatePresence>
+        {showHint && canScan && (
+          <motion.div
+            className="absolute bottom-20 left-1/2 -translate-x-1/2"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ delay: 1.5, duration: 0.6 }}
+          >
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-cyan-glow/20 bg-deep-space/80 backdrop-blur-sm">
+              <kbd className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-glow/10 border border-cyan-glow/30 text-cyan-glow/80">Space</kbd>
+              <span className="text-[11px] text-text-secondary font-mono">扫描信号</span>
+              <span className="text-[10px] text-text-dim/50 mx-1">|</span>
+              <kbd className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-glow/10 border border-cyan-glow/30 text-cyan-glow/80">Enter</kbd>
+              <span className="text-[11px] text-text-secondary font-mono">调制</span>
+              <span className="text-[10px] text-text-dim/50 mx-1">|</span>
+              <kbd className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-glow/10 border border-cyan-glow/30 text-cyan-glow/80">Esc</kbd>
+              <span className="text-[11px] text-text-secondary font-mono">休息</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Scan button */}
       {canScan && (

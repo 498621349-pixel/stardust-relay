@@ -19,6 +19,7 @@ export function DialogBox() {
   const prevPhaseRef = useRef<string>('idle')
   const prevSpeechEnabledRef = useRef(true)
   const justEnabledRef = useRef(false)
+  const typewriterSkipRef = useRef(false)
 
   // 语音开关：关闭时停止播放，开启时从头开始朗读当前文字
   useEffect(() => {
@@ -33,11 +34,21 @@ export function DialogBox() {
     prevSpeechEnabledRef.current = speechEnabled
   }, [speechEnabled, stop])
 
-  // 重置打字机效果
+  // 重置打字机效果（酿造/扫描等高频切换时直接跳完整文字）
   useEffect(() => {
-    setDisplayedText('')
-    setCurrentIndex(0)
-  }, [dialogText])
+    const isBrewingPhase = phase === 'brewing' || phase === 'scanning' || phase === 'mixing'
+    if (isBrewingPhase) {
+      // 高频阶段：直接显示完整文字，跳过打字动画
+      setDisplayedText(dialogText)
+      setCurrentIndex(dialogText.length)
+      typewriterSkipRef.current = true
+    } else {
+      // 正常阶段：从头开始打字
+      setDisplayedText('')
+      setCurrentIndex(0)
+      typewriterSkipRef.current = false
+    }
+  }, [dialogText, phase])
 
   // 打字机效果
   useEffect(() => {
@@ -150,20 +161,31 @@ export function DialogBox() {
   const isEmergency = phase === 'emergency'
   const isGameOver = phase === 'gameover'
   const isScanning = phase === 'scanning'
+  const isCritical = resources.energy < 5 && !isGameOver
 
   return (
     <div
       className={`relative bg-panel-bg/80 backdrop-blur-md border rounded-lg p-5 glow-border ${
-        isEmergency
-          ? 'border-alert-orange/30'
-          : isGameOver
-            ? 'border-red-500/30'
-            : 'border-panel-border'
+        isGameOver
+          ? 'border-red-500/40'
+          : isCritical
+            ? 'border-red-500/50 animate-pulse'
+            : isEmergency
+              ? 'border-alert-orange/30'
+              : 'border-panel-border'
       }`}
     >
-      {/* Emergency flash */}
+      {/* Emergency/Critical flash */}
       <AnimatePresence>
-        {isEmergency && (
+        {isCritical && (
+          <motion.div
+            className="absolute inset-0 rounded-lg pointer-events-none"
+            style={{ backgroundColor: 'rgba(255, 50, 50, 0.08)' }}
+            animate={{ opacity: [0.4, 0.8, 0.4] }}
+            transition={{ duration: 0.4, repeat: Infinity }}
+          />
+        )}
+        {!isCritical && isEmergency && (
           <motion.div
             className="absolute inset-0 rounded-lg pointer-events-none"
             style={{ backgroundColor: 'rgba(255, 140, 0, 0.03)' }}
@@ -225,8 +247,8 @@ export function DialogBox() {
         </div>
       </div>
 
-      {/* Bottom status line */}
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
+      {/* Bottom status line — hidden on mobile */}
+      <div className="hidden md:flex items-center justify-between mt-4 pt-3 border-t border-white/5">
         <div className="flex items-center gap-5">
           <span className="text-[11px] text-text-secondary font-mono tracking-wider">
             电力: <span className={resources.energy < 20 ? 'text-alert-orange/80' : 'text-cyan-glow/60'}>

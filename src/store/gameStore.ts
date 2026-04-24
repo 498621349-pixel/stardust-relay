@@ -1,6 +1,83 @@
 import { create } from 'zustand'
 import { getRandomNPC, type NPC } from '../data/npcs'
-import { calculateResult, checkSuccess } from '../data/cards'
+import { calculateResult, checkSuccess, getTolerance, getArrivalProbability } from '../data/cards'
+import { loadGame, saveGame, clearGame, type PersistedGameData, type MacroData, type NpcStats, type AchievementsState, checkAchievements as doCheckAchievements } from './gamePersist'
+
+// 加载存档（不存在时用默认）
+const savedData = loadGame()
+
+// 初始状态由存档决定，但访客/对话框等瞬时状态始终从默认值开始
+const initialState = {
+  phase: 'idle' as const,
+  resources: savedData.resources,
+  npc: null,
+  slots: [null, null, null] as (string | null)[],
+  mode: savedData.mode,
+  score: savedData.score,
+  servedCount: savedData.servedCount,
+  day: savedData.day,
+  dialogText: '深空很安静... 星尘驿站在轨道上稳定运行。系统待机中，等待下一个信号。',
+  dialogSpeaker: 'SYSTEM // 星尘驿站',
+  resultParams: null,
+  autoCollectors: savedData.autoCollectors,
+  macroUnlocked: savedData.macroUnlocked,
+  logs: [{ time: nowTime(), message: '系统启动完成。星尘驿站在线。', type: 'info' as const }],
+  scanProgress: 0,
+  brewProgress: 0,
+  speechEnabled: savedData.speechEnabled,
+  isResting: savedData.isResting,
+  soundEnabled: savedData.soundEnabled,
+  macros: savedData.macros,
+  npcStats: savedData.npcStats ?? {},
+  bgmEnabled: savedData.bgmEnabled ?? false,
+  bgmVolume: savedData.bgmVolume ?? 0.18,
+  achievements: savedData.achievements ?? { unlocked: [], justUnlocked: null },
+  streak: savedData.streak ?? 0,
+}
+
+// 读取存档后给出提示
+if (savedData.score > 0 || savedData.servedCount > 0) {
+  const savedDate = new Date(savedData.savedAt)
+  const timeStr = `${savedDate.getMonth() + 1}月${savedDate.getDate()}日 ${savedDate.getHours().toString().padStart(2, '0')}:${savedDate.getMinutes().toString().padStart(2, '0')}`
+  const idx = initialState.logs.findIndex(l => l.message === '系统启动完成。星尘驿站在线。')
+  if (idx !== -1) {
+    initialState.logs.splice(idx, 0, {
+      time: nowTime(),
+      message: `存档已加载。上次游玩：${timeStr} | 积分：${savedData.score} | 第${savedData.day}天`,
+      type: 'info' as const,
+    })
+  }
+}
+
+// 抽出需要持久化的状态片段（导出供 main.tsx 全局保存使用）
+export function toPersistedData(state: GameState): PersistedGameData {
+  return {
+    version: 1,
+    savedAt: Date.now(),
+    resources: state.resources,
+    score: state.score,
+    servedCount: state.servedCount,
+    day: state.day,
+    autoCollectors: state.autoCollectors,
+    macroUnlocked: state.macroUnlocked,
+    mode: state.mode,
+    soundEnabled: state.soundEnabled,
+    speechEnabled: state.speechEnabled,
+    isResting: state.isResting,
+    macros: state.macros,
+    npcStats: state.npcStats,
+    bgmEnabled: state.bgmEnabled,
+    bgmVolume: state.bgmVolume,
+    achievements: state.achievements,
+    streak: state.streak,
+  }
+}
+
+// 存档自动保存：在关键 action 后触发
+function autoSave(state: GameState) {
+  // 游戏结束时也保存（记录死亡状态）
+  saveGame(toPersistedData(state))
+}
 
 export type GamePhase =
   | 'idle'
@@ -46,6 +123,13 @@ interface GameState {
   brewProgress: number
   speechEnabled: boolean
   isResting: boolean
+  soundEnabled: boolean
+  macros: MacroData[]
+  npcStats: Record<string, NpcStats>
+  bgmEnabled: boolean
+  bgmVolume: number
+  achievements: AchievementsState
+  streak: number
 
   // Actions
   tick: () => void
@@ -61,6 +145,15 @@ interface GameState {
   addLog: (message: string, type?: LogEntry['type']) => void
   toggleSpeech: () => void
   toggleRest: () => void
+  toggleSound: () => void
+  resetGame: () => void
+  saveMacro: (name: string) => void
+  deleteMacro: (id: string) => void
+  applyMacro: (id: string, autoBrew?: boolean) => void
+  toggleBGM: () => void
+  setBGMVolume: (v: number) => void
+  incrementNpcStat: (npcId: string, success: boolean) => void
+  dismissAchievement: () => void
 }
 
 const POWER_DRAIN: Record<PowerMode, number> = {
@@ -75,28 +168,14 @@ function nowTime(): string {
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
-  phase: 'idle',
-  resources: { energy: 100, oxygen: 100, material: 100 },
-  npc: null,
-  slots: [null, null, null],
-  mode: 'normal',
-  score: 0,
-  servedCount: 0,
-  day: 1,
-  dialogText: '深空很安静... 星尘驿站在轨道上稳定运行。系统待机中，等待下一个信号。',
-  dialogSpeaker: 'SYSTEM // 星尘驿站',
-  resultParams: null,
-  autoCollectors: 0,
-  macroUnlocked: false,
-  logs: [{ time: nowTime(), message: '系统启动完成。星尘驿站在线。', type: 'info' }],
-  scanProgress: 0,
-  brewProgress: 0,
-  speechEnabled: false,
-  isResting: false,
+  ...initialState,
 
   tick: () => {
     const state = get()
-    if (state.phase === 'gameover') return
+    if (state.phase === 'gameover') {
+      autoSave(state)
+      return
+    }
 
     // 休息模式：能源不消耗，紧急/游戏结束也不触发
     const drain = state.isResting ? 0 : POWER_DRAIN[state.mode]
@@ -127,11 +206,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       const newProgress = state.scanProgress + 1.5
       if (newProgress >= 100) {
         const npc = getRandomNPC()
+        const tolerance = getTolerance(state.day)
         set({
           phase: 'arrived',
           npc,
           scanProgress: 0,
-          dialogText: npc.intro,
+          dialogText: `${npc.intro}当前容差范围：±${(tolerance * 100).toFixed(0)}%。`,
           dialogSpeaker: `SIGNAL // ${npc.name}`,
           resources: { energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
         })
@@ -151,10 +231,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (newProgress >= 100) {
         const result = calculateResult(state.slots)
         const target = state.npc!
-        const check = checkSuccess(result, { x: target.targetX, y: target.targetY, z: target.targetZ })
+        const check = checkSuccess(result, { x: target.targetX, y: target.targetY, z: target.targetZ }, getTolerance(state.day))
 
         if (check.success) {
           const line = target.successLines[Math.floor(Math.random() * target.successLines.length)]
+          const newStreak = state.streak + 1
+          const newAchievements = doCheckAchievements(
+            state.achievements,
+            { score: state.score + 100, servedCount: state.servedCount + 1, day: state.day + 1, streak: newStreak, npcStats: state.npcStats, wasFailed: false }
+          )
           set({
             phase: 'success',
             brewProgress: 0,
@@ -162,6 +247,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             score: state.score + 100,
             servedCount: state.servedCount + 1,
             day: state.day + 1,
+            streak: newStreak,
+            achievements: newAchievements,
             resources: {
               energy: Math.min(100, Math.max(0, newEnergy) + 25),
               oxygen: Math.min(100, Math.max(0, newOxygen) + 15),
@@ -171,12 +258,20 @@ export const useGameStore = create<GameState>((set, get) => ({
             dialogSpeaker: target.name,
           })
           get().addLog(`调制成功！${target.name} 已治愈。+100 积分`, 'success')
+          get().incrementNpcStat(target.id, true)
+          autoSave(get())
         } else {
           const line = target.failLines[Math.floor(Math.random() * target.failLines.length)]
+          const newAchievements = doCheckAchievements(
+            state.achievements,
+            { score: state.score, servedCount: state.servedCount, day: state.day, streak: 0, npcStats: state.npcStats, wasFailed: true }
+          )
           set({
             phase: 'failed',
             brewProgress: 0,
             resultParams: result,
+            streak: 0,
+            achievements: newAchievements,
             resources: {
               energy: Math.max(0, Math.max(0, newEnergy) - 3),
               oxygen: Math.max(0, Math.max(0, newOxygen) - 1),
@@ -186,6 +281,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             dialogSpeaker: target.name,
           })
           get().addLog(`调制失败。${target.name} 未治愈。`, 'warning')
+          get().incrementNpcStat(target.id, false)
+          autoSave(get())
         }
       } else {
         set({
@@ -198,7 +295,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // 休息时不自动接待访客
     if (state.phase === 'idle' && !state.isResting) {
-      if (Math.random() < 0.003) {
+      if (Math.random() < getArrivalProbability(state.day)) {
         set({
           phase: 'scanning',
           scanProgress: 0,
@@ -297,6 +394,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const state = get()
     if (state.phase === 'emergency' && mode !== 'eco') return
     set({ mode })
+    autoSave(get())
   },
 
   dismissResult: () => {
@@ -329,6 +427,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       dialogSpeaker: 'SHOP // 自动化中心',
     })
     get().addLog(`购买物流小球 #${state.autoCollectors + 1}`, 'success')
+    autoSave(get())
   },
 
   unlockMacro: () => {
@@ -349,6 +448,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       dialogSpeaker: 'SHOP // 自动化中心',
     })
     get().addLog('宏指令系统解锁', 'success')
+    autoSave(get())
   },
 
   addLog: (message: string, type: LogEntry['type'] = 'info') => {
@@ -360,6 +460,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   toggleSpeech: () => {
     const state = get()
     set({ speechEnabled: !state.speechEnabled })
+    autoSave(get())
   },
 
   toggleRest: () => {
@@ -389,5 +490,144 @@ export const useGameStore = create<GameState>((set, get) => ({
       })
       get().addLog('调度员休息，驿站进入休眠模式。', 'info')
     }
+    autoSave(get())
+  },
+
+  toggleSound: () => {
+    set((state) => ({ soundEnabled: !state.soundEnabled }))
+    autoSave(get())
+  },
+
+  saveMacro: (name: string) => {
+    const state = get()
+    const filledSlots = state.slots.filter((s) => s !== null)
+    const macroName = name.trim() || `配方 ${state.macros.length + 1}`
+    if (filledSlots.length === 0) {
+      set({
+        dialogText: '当前插槽为空，无法保存空白配方。',
+        dialogSpeaker: 'ERROR // 宏指令系统',
+      })
+      return
+    }
+    if (state.macros.some((m) => m.name === macroName)) {
+      get().addLog('配方名称已存在，请使用其他名称。', 'warning')
+      set({
+        dialogText: '配方名称已存在，请使用其他名称。',
+        dialogSpeaker: 'ERROR // 宏指令系统',
+      })
+      return
+    }
+    const newMacro: MacroData = {
+      id: `macro_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: macroName,
+      slots: [...state.slots],
+    }
+    set({ macros: [...state.macros, newMacro] })
+    autoSave(get())
+    set({
+      dialogText: `宏指令「${newMacro.name}」已保存。`,
+      dialogSpeaker: 'MACRO // 宏指令系统',
+    })
+  },
+
+  deleteMacro: (id: string) => {
+    const state = get()
+    set({ macros: state.macros.filter((m) => m.id !== id) })
+    autoSave(get())
+  },
+
+  applyMacro: (id: string, autoBrew = false) => {
+    const state = get()
+    const macro = state.macros.find((m) => m.id === id)
+    if (!macro) return
+    if (state.phase !== 'arrived' && state.phase !== 'mixing') {
+      set({
+        dialogText: '访客未到达，无法应用宏指令。',
+        dialogSpeaker: 'ERROR // 宏指令系统',
+      })
+      return
+    }
+    set({
+      slots: [...macro.slots],
+      phase: macro.slots.some((s) => s !== null) ? 'mixing' : 'arrived',
+      dialogText: `宏指令「${macro.name}」已加载。`,
+      dialogSpeaker: 'MACRO // 宏指令系统',
+    })
+    if (autoBrew) {
+      setTimeout(() => {
+        const current = useGameStore.getState()
+        if (current.phase === 'mixing' || current.phase === 'arrived') {
+          current.brew()
+        }
+      }, 100)
+    }
+  },
+
+  toggleBGM: () => {
+    set((state) => ({ bgmEnabled: !state.bgmEnabled }))
+    autoSave(get())
+  },
+
+  setBGMVolume: (v: number) => {
+    set({ bgmVolume: Math.max(0, Math.min(1, v)) })
+    autoSave(get())
+  },
+
+  incrementNpcStat: (npcId: string, success: boolean) => {
+    const state = get()
+    const current = state.npcStats[npcId] ?? { successCount: 0, failCount: 0 }
+    const updated: Record<string, NpcStats> = {
+      ...state.npcStats,
+      [npcId]: {
+        successCount: current.successCount + (success ? 1 : 0),
+        failCount: current.failCount + (success ? 0 : 1),
+      },
+    }
+    set({ npcStats: updated })
+    autoSave(get())
+  },
+
+  resetGame: () => {
+    clearGame()
+    const defaults = {
+      phase: 'idle' as const,
+      resources: { energy: 100, oxygen: 100, material: 100 },
+      npc: null,
+      slots: [null, null, null] as (string | null)[],
+      mode: 'normal' as const,
+      score: 0,
+      servedCount: 0,
+      day: 1,
+      dialogText: '深空很安静... 星尘驿站在轨道上稳定运行。系统待机中，等待下一个信号。',
+      dialogSpeaker: 'SYSTEM // 星尘驿站',
+      resultParams: null,
+      autoCollectors: 0,
+      macroUnlocked: false,
+      macros: [] as MacroData[],
+      logs: [{ time: nowTime(), message: '游戏已重置。所有进度已清除。', type: 'info' as const }],
+      scanProgress: 0,
+      brewProgress: 0,
+      speechEnabled: false,
+      isResting: false,
+      soundEnabled: true,
+      npcStats: {} as Record<string, NpcStats>,
+      bgmEnabled: false,
+      bgmVolume: 0.18,
+      achievements: { unlocked: [], justUnlocked: null } as AchievementsState,
+      streak: 0,
+    }
+    set(defaults)
+  },
+
+  dismissAchievement: () => {
+    set({ achievements: { ...get().achievements, justUnlocked: null } })
   },
 }))
+
+// 统一存档监听：关键字段变化时自动触发存档，替代散落的 autoSave(get()) 调用
+useGameStore.subscribe((state, prev) => {
+  const changed = (k: string) => JSON.stringify(state[k as keyof typeof state]) !== JSON.stringify(prev[k as keyof typeof prev])
+  if (['resources', 'achievements', 'npcStats', 'macros', 'mode'].some(changed)) {
+    saveGame(toPersistedData(state))
+  }
+})

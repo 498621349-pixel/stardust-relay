@@ -1,6 +1,9 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { Activity, Brain, Thermometer, CheckCircle, XCircle, Lightbulb, Snowflake, Flame, Radio, User, Palette } from 'lucide-react'
+import { Activity, Brain, Thermometer, CheckCircle, XCircle, Lightbulb, Snowflake, Flame, Radio, User, Palette, BookOpen } from 'lucide-react'
 import { useGameStore } from '../store/gameStore'
+import { getAffectionTier } from '../store/gamePersist'
+import { useState } from 'react'
+import type { NPC } from '../data/npcs'
 
 // NPC 可视化组件
 function NPCVisual({ type, color, currentE, currentP, isSuccess, isFailed }: { type: string; color: string; currentE: number; currentP: number; isSuccess?: boolean; isFailed?: boolean }) {
@@ -10,9 +13,7 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess, isFailed }: { t
   const isDim = isFailed
 
   const getIcon = () => {
-    if (isSuccess) {
-      return <CheckCircle size={40} style={{ color: successColor }} />
-    }
+    if (isSuccess) return <CheckCircle size={40} style={{ color: successColor }} />
     switch (type) {
       case '深空探索AI': return <Snowflake size={40} style={{ color: isDim ? failedColor : color }} />
       case '货运飞船驾驶员': return <Flame size={40} style={{ color: isDim ? failedColor : color }} />
@@ -30,190 +31,105 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess, isFailed }: { t
       animate={{ scale: isSuccess ? [1, 1.1, 1] : 1, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 200, damping: 20 }}
     >
-      {/* 成功光芒效果 */}
       {isSuccess && (
         <>
-          <motion.div
-            className="absolute inset-0 rounded-full"
-            style={{ backgroundColor: `${successColor}20` }}
+          <motion.div className="absolute inset-0 rounded-full" style={{ backgroundColor: `${successColor}20` }}
             animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }}
             transition={{ duration: 1.5, repeat: Infinity }}
           />
-          {/* 庆祝粒子 */}
           {[...Array(8)].map((_, i) => (
             <motion.div
-              key={`celeb-${i}`}
-              className="absolute w-1.5 h-1.5 rounded-full"
-              style={{
-                backgroundColor: ['#FFD700', '#00F2FF', '#FF6B9D', '#AA64FF'][i % 4],
-                boxShadow: `0 0 6px ${['#FFD700', '#00F2FF', '#FF6B9D', '#AA64FF'][i % 4]}`,
-              }}
-              animate={{
-                // @ts-ignore
-                angle: i * 45,
-                distance: [20, 40, 20],
-                opacity: [0, 1, 0],
-              }}
+              key={`celeb-${i}`} className="absolute w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: ['#FFD700', '#00F2FF', '#FF6B9D', '#AA64FF'][i % 4], boxShadow: `0 0 6px ${['#FFD700', '#00F2FF', '#FF6B9D', '#AA64FF'][i % 4]}` }}
+              animate={{ // @ts-ignore
+                angle: i * 45, distance: [20, 40, 20], opacity: [0, 1, 0] }}
               transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
             />
           ))}
         </>
       )}
-
-      {/* 外圈 - 根据情绪波动旋转 */}
-      <motion.div
-        className="absolute inset-0 rounded-full border-2"
-        style={{
-          borderColor: isDim ? `${failedColor}20` : (isSuccess ? `${successColor}60` : `${color}40`),
-          borderStyle: isDim ? 'dotted' : (isSuccess ? 'solid' : 'dashed')
-        }}
+      <motion.div className="absolute inset-0 rounded-full border-2"
+        style={{ borderColor: isDim ? `${failedColor}20` : (isSuccess ? `${successColor}60` : `${color}40`), borderStyle: isDim ? 'dotted' : (isSuccess ? 'solid' : 'dashed') }}
         animate={isDim ? { rotate: 360, scale: [1, 0.95, 1], opacity: [0.4, 0.6, 0.4] } : (isSuccess ? { rotate: 360, scale: [1, 1.05, 1] } : { rotate: 360 })}
         transition={{ duration: isDim ? 15 : (isSuccess ? 3 : 8), repeat: Infinity, ease: 'linear' }}
       />
-
-      {/* 失败暗淡光晕 */}
       {isFailed && (
-        <motion.div
-          className="absolute inset-0 rounded-full"
-          style={{ backgroundColor: 'rgba(180,30,30,0.15)' }}
+        <motion.div className="absolute inset-0 rounded-full" style={{ backgroundColor: 'rgba(180,30,30,0.15)' }}
           animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 2, repeat: Infinity }}
         />
       )}
-
-      {/* 中圈 - 根据逻辑缺损脉动 */}
-      <motion.div
-        className="absolute inset-2 rounded-full border"
-        style={{
-          borderColor: isDim ? `${failedColor}25` : (isSuccess ? `${successColor}60` : `${color}60`),
-          boxShadow: `0 0 ${isDim ? 10 : (isSuccess ? 30 : 20 + currentP * 30)}px ${isDim ? failedColor : (isSuccess ? successColor : color)}${isDim ? '15' : '30'}`,
-        }}
+      <motion.div className="absolute inset-2 rounded-full border"
+        style={{ borderColor: isDim ? `${failedColor}25` : (isSuccess ? `${successColor}60` : `${color}60`), boxShadow: `0 0 ${isDim ? 10 : (isSuccess ? 30 : 20 + currentP * 30)}px ${isDim ? failedColor : (isSuccess ? successColor : color)}${isDim ? '15' : '30'}` }}
         animate={isDim ? { scale: [0.95, 1, 0.95] } : (isSuccess ? { scale: [1, 1.1, 1] } : { scale: [1, 1 + currentP * 0.1, 1] })}
         transition={{ duration: isDim ? 4 : (isSuccess ? 1 : 2), repeat: Infinity, ease: 'easeInOut' }}
       />
-
-      {/* 内圈 - 主图标 */}
-      <motion.div
-        className="absolute inset-4 rounded-full flex items-center justify-center"
-        style={{
-          backgroundColor: `${currentColor}${isDim ? '08' : '15'}`,
-          boxShadow: `0 0 30px ${currentColor}${isDim ? '15' : '40'}, inset 0 0 20px ${currentColor}${isDim ? '08' : '20'}`,
-        }}
+      <motion.div className="absolute inset-4 rounded-full flex items-center justify-center"
+        style={{ backgroundColor: `${currentColor}${isDim ? '08' : '15'}`, boxShadow: `0 0 30px ${currentColor}${isDim ? '15' : '40'}, inset 0 0 20px ${currentColor}${isDim ? '08' : '20'}` }}
         animate={isDim ? { y: [0, 3, 0], scale: [1, 0.9, 1] } : (isSuccess ? { y: [0, -5, 0] } : {})}
         transition={{ duration: isDim ? 3 : (isSuccess ? 1 : 0), repeat: Infinity }}
       >
         {getIcon()}
       </motion.div>
-
-      {/* 扫描线 - 非成功非失败状态 */}
       {!isSuccess && !isFailed && (
-        <motion.div
-          className="absolute left-0 right-0 h-0.5"
-          style={{
-            backgroundColor: color,
-            boxShadow: `0 0 10px ${color}`,
-          }}
+        <motion.div className="absolute left-0 right-0 h-0.5"
+          style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }}
           animate={{ top: ['0%', '100%', '0%'] }}
           transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
         />
       )}
-
-      {/* 状态指示器 */}
-      <motion.div
-        className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-mono"
-        style={{
-          backgroundColor: `${currentColor}${isDim ? '20' : '30'}`,
-          color: currentColor,
-          border: `1px solid ${currentColor}${isDim ? '25' : '50'}`,
-        }}
+      <motion.div className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-mono"
+        style={{ backgroundColor: `${currentColor}${isDim ? '20' : '30'}`, color: currentColor, border: `1px solid ${currentColor}${isDim ? '25' : '50'}` }}
         animate={isDim ? { opacity: [0.5, 0.7, 0.5] } : (isSuccess ? { scale: [1, 1.1, 1] } : { opacity: [0.7, 1, 0.7] })}
         transition={{ duration: isDim ? 3 : (isSuccess ? 0.8 : 2), repeat: Infinity }}
       >
         {isSuccess ? '已治愈!' : isFailed ? '未治愈' : `E: ${(currentE * 100).toFixed(0)}%`}
       </motion.div>
-
-      {/* 粒子效果 - 非成功非失败状态 */}
       {!isSuccess && !isFailed && type === '深空探索AI' && (
         <div className="absolute inset-0">
           {[...Array(6)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1 h-1 rounded-full"
-              style={{ backgroundColor: color }}
-              animate={{
-                // @ts-ignore
-                angle: [i * 60, i * 60 + 360],
-                distance: [15, 35, 15],
-              }}
+            <motion.div key={i} className="absolute w-1 h-1 rounded-full" style={{ backgroundColor: color }}
+              animate={{ // @ts-ignore
+                angle: [i * 60, i * 60 + 360], distance: [15, 35, 15] }}
               transition={{ duration: 4, repeat: Infinity, delay: i * 0.2 }}
             />
           ))}
         </div>
       )}
-
       {!isSuccess && !isFailed && type === '货运飞船驾驶员' && (
         <div className="absolute inset-0">
           {[...Array(4)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: '#FF8C00' }}
-              animate={{
-                y: [20, -20],
-                opacity: [0.8, 0],
-                x: [(i - 1.5) * 8],
-              }}
+            <motion.div key={i} className="absolute w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#FF8C00' }}
+              animate={{ y: [20, -20], opacity: [0.8, 0], x: [(i - 1.5) * 8] }}
               transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.3 }}
             />
           ))}
         </div>
       )}
-
       {!isSuccess && !isFailed && type === '通讯中继站AI' && (
         <div className="absolute inset-0">
           {[...Array(3)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute h-px rounded-full"
-              style={{
-                backgroundColor: color,
-                left: '50%',
-                top: '50%',
-                width: 20 + i * 15,
-                transform: `translate(-50%, -50%) rotate(${i * 45}deg)`,
-              }}
+            <motion.div key={i} className="absolute h-px rounded-full"
+              style={{ backgroundColor: color, left: '50%', top: '50%', width: 20 + i * 15, transform: `translate(-50%, -50%) rotate(${i * 45}deg)` }}
               animate={{ opacity: [0.3, 0.8, 0.3], scaleX: [1, 1.2, 1] }}
               transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
             />
           ))}
         </div>
       )}
-
       {!isSuccess && !isFailed && type === '艺术生成AI' && (
         <div className="absolute inset-0">
           {['#FF6B9D', '#00F2FF', '#AA64FF', '#5EC0D8', '#FF8C00'].map((c, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-2 h-2 rounded-full"
-              style={{
-                backgroundColor: c,
-                boxShadow: `0 0 8px ${c}`,
-              }}
-              animate={{
-                // @ts-ignore
-                angle: i * 72,
-                distance: 25,
-              }}
+            <motion.div key={i} className="absolute w-2 h-2 rounded-full" style={{ backgroundColor: c, boxShadow: `0 0 8px ${c}` }}
+              animate={{ // @ts-ignore
+                angle: i * 72, distance: 25 }}
               transition={{ duration: 3, repeat: Infinity, delay: i * 0.2 }}
             />
           ))}
         </div>
       )}
-
       {!isSuccess && !isFailed && type === '冬眠宇航员' && (
-        <motion.div
-          className="absolute inset-0 rounded-full"
-          style={{ backgroundColor: `${color}10` }}
+        <motion.div className="absolute inset-0 rounded-full" style={{ backgroundColor: `${color}10` }}
           animate={{ opacity: [0.3, 0.6, 0.3] }}
           transition={{ duration: 4, repeat: Infinity }}
         />
@@ -222,17 +138,71 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess, isFailed }: { t
   )
 }
 
+// 访客档案一览（无访客时显示）
+function VisitorJournal() {
+  const npcStats = useGameStore((s) => s.npcStats)
+  const npcList: NPC[] = [
+    { id: 'frost', name: 'Unit-7749 "霜语"', type: '深空探索AI', avatarColor: '#00F2FF', targetX: 1.0, targetY: 0.5, targetZ: 1.0, currentE: 0.23, currentP: 0.67, intro: '', successLines: [], failLines: [] } as NPC,
+    { id: 'ember', name: 'AS-221 "烬星"', type: '货运飞船驾驶员', avatarColor: '#FF8C00', targetX: 0.4, targetY: 0.8, targetZ: 1.0, currentE: 0.89, currentP: 0.31, intro: '', successLines: [], failLines: [] } as NPC,
+    { id: 'echo', name: 'Signal-0 "回声"', type: '通讯中继站AI', avatarColor: '#AA64FF', targetX: 0.67, targetY: 0.67, targetZ: 0.67, currentE: 0.12, currentP: 0.54, intro: '', successLines: [], failLines: [] } as NPC,
+    { id: 'anchor', name: 'Dr. 陈 "锚点"', type: '冬眠宇航员', avatarColor: '#5EC0D8', targetX: 0.125, targetY: 1.0, targetZ: 0.5, currentE: 0.05, currentP: 0.82, intro: '', successLines: [], failLines: [] } as NPC,
+    { id: 'prism', name: 'Prism-7 "七色"', type: '艺术生成AI', avatarColor: '#FF6B9D', targetX: 0.75, targetY: 0.75, targetZ: 0.75, currentE: 0.76, currentP: 0.19, intro: '', successLines: [], failLines: [] } as NPC,
+  ]
+
+  const tierColors: Record<string, string> = { '陌生': '#666', '相识': '#5EC0D8', '熟悉': '#AA64FF', '信任': '#FFD700' }
+
+  return (
+    <div className="flex-1 flex flex-col">
+      <div className="text-[11px] text-text-secondary uppercase tracking-wider font-mono mb-3 flex items-center gap-1.5">
+        <BookOpen size={12} className="text-cyan-glow/50" />
+        访客档案
+      </div>
+      <div className="flex-1 overflow-y-auto space-y-1.5">
+        {npcList.map((n) => {
+          const stats = npcStats[n.id]
+          const tier = getAffectionTier(stats?.successCount ?? 0)
+          const tc = tierColors[tier]
+          const unlocked = (stats?.successCount ?? 0) >= 1
+          return (
+            <div key={n.id} className="flex items-center gap-2 px-2 py-1.5 rounded border border-white/5 bg-white/[0.02]">
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: unlocked ? tc : '#333', boxShadow: unlocked ? `0 0 4px ${tc}` : 'none' }} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-mono truncate" style={{ color: unlocked ? n.avatarColor : '#555' }}>
+                  {n.name.split('"')[0]}
+                </div>
+              </div>
+              <span className="text-[9px] font-mono flex-shrink-0 px-1.5 py-0.5 rounded" style={{ color: tc, backgroundColor: `${tc}15`, border: `1px solid ${tc}30` }}>
+                {tier}
+              </span>
+              {stats && (
+                <span className="text-[9px] text-text-dim/60 font-mono flex-shrink-0">{stats.successCount}✓</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function NPCScanner() {
   const npc = useGameStore((s) => s.npc)
   const phase = useGameStore((s) => s.phase)
   const resultParams = useGameStore((s) => s.resultParams)
+  const npcStats = useGameStore((s) => s.npcStats)
+  const [showJournal, setShowJournal] = useState(false)
 
   const hasNPC = npc !== null
   const isSuccess = phase === 'success'
   const isFailed = phase === 'failed'
   const showResult = isSuccess || isFailed
 
-  // Hints based on NPC
+  const currentStats = npc ? (npcStats[npc.id] ?? { successCount: 0, failCount: 0 }) : null
+  const currentTier = currentStats ? getAffectionTier(currentStats.successCount) : '陌生'
+  const tierColors: Record<string, string> = { '陌生': '#666', '相识': '#5EC0D8', '熟悉': '#AA64FF', '信任': '#FFD700' }
+  const tierColor = tierColors[currentTier]
+  const hasUnlocked = (currentStats?.successCount ?? 0) >= 1
+
   const getHint = () => {
     if (!npc) return ''
     const hints: Record<string, string> = {
@@ -247,143 +217,114 @@ export function NPCScanner() {
 
   return (
     <div className="bg-panel-bg backdrop-blur-md border border-panel-border rounded-lg p-5 glow-border h-full flex flex-col relative">
-      {/* 失败暗淡背景滤镜 */}
       {isFailed && (
-        <motion.div
-          className="absolute inset-0 rounded-lg pointer-events-none z-10"
-          style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
+        <motion.div className="absolute inset-0 rounded-lg pointer-events-none z-10" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}
         />
       )}
-      <div className="flex items-center justify-between mb-5">
-        <h3 className="text-[13px] tracking-[0.15em] text-cyan-glow/70 uppercase font-mono glow-text">
-          访客扫描仪
-        </h3>
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <h3 className="text-[13px] tracking-[0.15em] text-cyan-glow/70 uppercase font-mono glow-text">
+            访客扫描仪
+          </h3>
+          {!hasNPC && (
+            <button
+              onClick={() => setShowJournal((v) => !v)}
+              className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded border border-cyan-glow/20 text-cyan-glow/50 hover:border-cyan-glow/40 hover:text-cyan-glow/70 transition-all"
+            >
+              <BookOpen size={10} />
+              {showJournal ? '返回' : '档案'}
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {hasNPC && !showResult && (
-            <>
-              <div className="w-2 h-2 rounded-full bg-alert-orange animate-pulse" />
-              <span className="text-[11px] text-alert-orange font-mono uppercase tracking-wider">检测中</span>
-            </>
+            <><div className="w-2 h-2 rounded-full bg-alert-orange animate-pulse" /><span className="text-[11px] text-alert-orange font-mono uppercase tracking-wider">检测中</span></>
           )}
           {showResult && (
-            <>
-              {isSuccess ? (
-                <CheckCircle size={14} className="text-cyan-glow/70" />
-              ) : (
-                <XCircle size={14} className="text-alert-orange/70" />
-              )}
-              <span className={`text-[11px] font-mono uppercase tracking-wider ${isSuccess ? 'text-cyan-glow/70' : 'text-alert-orange/70'}`}>
-                {isSuccess ? '治愈' : '未治愈'}
-              </span>
-            </>
+            <>{isSuccess ? <CheckCircle size={14} className="text-cyan-glow/70" /> : <XCircle size={14} className="text-alert-orange/70" />}
+            <span className={`text-[11px] font-mono uppercase tracking-wider ${isSuccess ? 'text-cyan-glow/70' : 'text-alert-orange/70'}`}>
+              {isSuccess ? '治愈' : '未治愈'}
+            </span></>
           )}
           {!hasNPC && (
-            <>
-              <div className="w-2 h-2 rounded-full bg-text-dim/30" />
-              <span className="text-[11px] text-text-dim/50 font-mono uppercase tracking-wider">无信号</span>
-            </>
+            <><div className="w-2 h-2 rounded-full bg-text-dim/30" /><span className="text-[11px] text-text-dim/50 font-mono uppercase tracking-wider">无信号</span></>
           )}
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {hasNPC ? (
-          <motion.div
-            key={npc.id}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.5 }}
-            className="flex-1 flex flex-col"
-          >
-            {/* NPC Avatar */}
-            <NPCVisual
-              type={npc.type}
-              color={npc.avatarColor}
-              currentE={npc.currentE}
-              currentP={npc.currentP}
-              isSuccess={isSuccess}
-              isFailed={isFailed}
-            />
-
-            {/* NPC Info */}
-            <div className="text-center mb-3">
-              <div className="text-[14px] font-mono font-medium mb-1 truncate" style={{ color: npc.avatarColor }}>
-                {npc.name}
-              </div>
-              <div className="text-[11px] text-text-secondary font-mono tracking-wider">类型: {npc.type}</div>
-              <div className="text-[11px] text-text-secondary font-mono tracking-wider">
-                {isSuccess ? '已治愈' : isFailed ? '症状加重' : '逻辑过载/情绪冻结'}
-              </div>
-            </div>
-
-            {/* Hint */}
-            {!showResult && (
-              <motion.div
-                className="mb-3 p-2.5 rounded-lg border border-cyan-glow/15 bg-cyan-glow/5"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1 }}
-              >
-                <div className="flex items-start gap-2">
-                  <Lightbulb size={12} className="text-cyan-glow/50 flex-shrink-0 mt-0.5" />
-                  <span className="text-[10px] text-cyan-glow/60 font-mono leading-relaxed break-words">{getHint()}</span>
+      {/* 访客档案一览（无访客时显示） */}
+      {showJournal && !hasNPC ? (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <VisitorJournal />
+        </motion.div>
+      ) : (
+        <AnimatePresence mode="wait">
+          {hasNPC ? (
+            <motion.div
+              key={npc.id}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.5 }}
+              className="flex-1 flex flex-col"
+            >
+              {/* 好感度标签 */}
+              {hasUnlocked && (
+                <div className="flex justify-center mb-2">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `${tierColor}50`, backgroundColor: `${tierColor}12` }}>
+                    {currentTier} · {currentStats!.successCount} 次治愈
+                  </span>
                 </div>
-              </motion.div>
-            )}
+              )}
 
-            {/* Metrics */}
-            <div className="space-y-4">
-              <MetricRow
-                icon={<Activity size={14} />}
-                label="情绪波动值 E"
-                value={npc.currentE}
-                target={0.5}
-                color="#00F2FF"
-                isSuccess={isSuccess}
-              />
-              <MetricRow
-                icon={<Thermometer size={14} />}
-                label="逻辑缺损 P"
-                value={npc.currentP}
-                target={0.2}
-                color="#FF8C00"
-                isSuccess={isSuccess}
-              />
-            </div>
+              <NPCVisual type={npc.type} color={npc.avatarColor} currentE={npc.currentE} currentP={npc.currentP} isSuccess={isSuccess} isFailed={isFailed} />
 
-            {/* Target parameters */}
-            <div className="mt-auto pt-4">
-              <div className="text-[11px] text-text-secondary uppercase tracking-wider font-mono mb-2">
-                目标参数 {showResult && <span className="text-text-dim/50 normal-case tracking-normal">(实际值)</span>}
+              <div className="text-center mb-3">
+                <div className="text-[14px] font-mono font-medium mb-1 truncate" style={{ color: npc.avatarColor }}>{npc.name}</div>
+                <div className="text-[11px] text-text-secondary font-mono tracking-wider">类型: {npc.type}</div>
+                <div className="text-[11px] text-text-secondary font-mono tracking-wider">
+                  {isSuccess ? '已治愈' : isFailed ? '症状加重' : '逻辑过载/情绪冻结'}
+                </div>
               </div>
-              <div className="flex gap-2 min-w-0">
-                <ParamLabel label="X" target={npc.targetX} actual={resultParams?.x} color="#00F2FF" />
-                <ParamLabel label="Y" target={npc.targetY} actual={resultParams?.y} color="#5EC0D8" />
-                <ParamLabel label="Z" target={npc.targetZ} actual={resultParams?.z} color="#AA64FF" />
+
+              {!showResult && (
+                <motion.div className="mb-3 p-2.5 rounded-lg border border-cyan-glow/15 bg-cyan-glow/5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}>
+                  <div className="flex items-start gap-2">
+                    <Lightbulb size={12} className="text-cyan-glow/50 flex-shrink-0 mt-0.5" />
+                    <span className="text-[10px] text-cyan-glow/60 font-mono leading-relaxed break-words">{getHint()}</span>
+                  </div>
+                </motion.div>
+              )}
+
+              <div className="space-y-4">
+                <MetricRow icon={<Activity size={14} />} label="情绪波动值 E" value={npc.currentE} target={0.5} color="#00F2FF" isSuccess={isSuccess} />
+                <MetricRow icon={<Thermometer size={14} />} label="逻辑缺损 P" value={npc.currentP} target={0.2} color="#FF8C00" isSuccess={isSuccess} />
               </div>
-              <div className="text-[9px] text-text-dim/50 font-mono mt-2 truncate">
-                容差范围: ±30%
+
+              {/* 目标参数 */}
+              <div className="mt-auto pt-4">
+                <div className="text-[11px] text-text-secondary uppercase tracking-wider font-mono mb-2">
+                  目标参数 {showResult && <span className="text-text-dim/50 normal-case tracking-normal">(实际值)</span>}
+                </div>
+                <div className="flex gap-2 min-w-0">
+                  <ParamLabel label="X" target={npc.targetX} actual={resultParams?.x} color="#00F2FF" />
+                  <ParamLabel label="Y" target={npc.targetY} actual={resultParams?.y} color="#5EC0D8" />
+                  <ParamLabel label="Z" target={npc.targetZ} actual={resultParams?.z} color="#AA64FF" />
+                </div>
+                <div className="text-[9px] text-text-dim/50 font-mono mt-2 truncate">容差范围: ±30%</div>
               </div>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="empty"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex-1 flex flex-col items-center justify-center text-text-dim/30"
-          >
-            <Brain size={48} className="mb-4 opacity-20" />
-            <div className="text-[13px] font-mono">暂无访客信号</div>
-            <div className="text-[11px] font-mono mt-2">等待深空扫描...</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          ) : (
+            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex-1 flex flex-col items-center justify-center text-text-dim/30">
+              <Brain size={48} className="mb-4 opacity-20" />
+              <div className="text-[13px] font-mono">暂无访客信号</div>
+              <div className="text-[11px] font-mono mt-2">等待深空扫描...</div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
     </div>
   )
 }
@@ -392,7 +333,6 @@ function ParamLabel({ label, target, actual, color }: { label: string; target: n
   const showActual = actual !== undefined
   const error = showActual ? Math.abs(actual - target) / target : 0
   const isMatch = error <= 0.30
-
   return (
     <div className="flex-1 min-w-0 px-1 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-center overflow-hidden">
       <div style={{ color }} className="text-[10px] font-medium mb-0.5 truncate">{label}</div>
@@ -406,16 +346,7 @@ function ParamLabel({ label, target, actual, color }: { label: string; target: n
   )
 }
 
-interface MetricRowProps {
-  icon: React.ReactNode
-  label: string
-  value: number
-  target: number
-  color: string
-  isSuccess?: boolean
-}
-
-function MetricRow({ icon, label, value, target, color, isSuccess }: MetricRowProps) {
+function MetricRow({ icon, label, value, target, color, isSuccess }: { icon: React.ReactNode; label: string; value: number; target: number; color: string; isSuccess?: boolean }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
@@ -423,26 +354,14 @@ function MetricRow({ icon, label, value, target, color, isSuccess }: MetricRowPr
           <span style={{ color }}>{icon}</span>
           <span className="text-[11px] text-text-secondary font-mono">{label}</span>
         </div>
-        <span className="text-[11px] font-mono tabular-nums" style={{ color }}>
-          {(value * 100).toFixed(0)}%
-        </span>
+        <span className="text-[11px] font-mono tabular-nums" style={{ color }}>{(value * 100).toFixed(0)}%</span>
       </div>
       <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
-        <motion.div
-          className="absolute inset-y-0 left-0 rounded-full"
-          style={{
-            width: `${value * 100}%`,
-            backgroundColor: isSuccess ? '#00F2FF' : color,
-            boxShadow: `0 0 4px ${isSuccess ? '#00F2FF' : color}60`,
-          }}
-          initial={{ width: 0 }}
-          animate={{ width: `${value * 100}%` }}
-          transition={{ duration: 1.5, ease: 'easeOut' }}
+        <motion.div className="absolute inset-y-0 left-0 rounded-full"
+          style={{ width: `${value * 100}%`, backgroundColor: isSuccess ? '#00F2FF' : color, boxShadow: `0 0 4px ${isSuccess ? '#00F2FF' : color}60` }}
+          initial={{ width: 0 }} animate={{ width: `${value * 100}%` }} transition={{ duration: 1.5, ease: 'easeOut' }}
         />
-        <div
-          className="absolute top-0 bottom-0 w-px bg-white/50"
-          style={{ left: `${target * 100}%` }}
-        />
+        <div className="absolute top-0 bottom-0 w-px bg-white/50" style={{ left: `${target * 100}%` }} />
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Zap, Wind, Hexagon, Bot, Command } from 'lucide-react'
+import { Zap, Wind, Hexagon, Bot, Command, RotateCcw } from 'lucide-react'
 import { useGameStore } from '../store/gameStore'
 
 interface ResourceBarProps {
@@ -175,6 +175,21 @@ export function ResourcePanel() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Danger zone */}
+        <div className="mt-3 pt-3 border-t border-white/5">
+          <button
+            onClick={() => {
+              if (window.confirm('确定要重置游戏吗？所有进度将被清除，且无法恢复。')) {
+                useGameStore.getState().resetGame()
+              }
+            }}
+            className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-mono text-text-dim/40 hover:text-text-dim/70 transition-all rounded hover:bg-white/5 w-full justify-center"
+          >
+            <RotateCcw size={10} />
+            重置游戏
+          </button>
         </div>
       </div>
     </div>
