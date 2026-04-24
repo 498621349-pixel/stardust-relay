@@ -214,6 +214,21 @@ const NPC_TEMPLATES: NPC[] = [
   },
 ]
 
-export function getRandomNPC(): NPC {
-  return NPC_TEMPLATES[Math.floor(Math.random() * NPC_TEMPLATES.length)]
+import type { NpcStats } from '../store/gamePersist'
+
+export function getWeightedRandomNPC(npcStats: Record<string, NpcStats> = {}): NPC {
+  const weights = NPC_TEMPLATES.map((npc) => {
+    const stats = npcStats[npc.id]
+    const served = stats ? stats.successCount > 0 : false
+    return served ? 0.2 : 1.0
+  })
+  const total = weights.reduce((a, b) => a + b, 0)
+  let r = Math.random() * total
+  for (let i = 0; i < NPC_TEMPLATES.length; i++) {
+    r -= weights[i]
+    if (r <= 0) return NPC_TEMPLATES[i]
+  }
+  return NPC_TEMPLATES[NPC_TEMPLATES.length - 1]
 }
+
+export { NPC_TEMPLATES }

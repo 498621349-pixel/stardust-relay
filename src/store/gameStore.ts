@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { getRandomNPC, type NPC } from '../data/npcs'
+import { getWeightedRandomNPC, type NPC } from '../data/npcs'
 import { calculateResult, checkSuccess, getTolerance, getArrivalProbability } from '../data/cards'
 import { loadGame, saveGame, clearGame, type PersistedGameData, type MacroData, type NpcStats, type AchievementsState, checkAchievements as doCheckAchievements } from './gamePersist'
 
@@ -229,7 +229,7 @@ export const useGameStore = create<GameState>()((set, get) =>
     if (state.phase === 'scanning') {
       const newProgress = state.scanProgress + 1.5
       if (newProgress >= 100) {
-        const npc = getRandomNPC()
+        const npc = getWeightedRandomNPC(state.npcStats)
         const tolerance = getTolerance(state.day)
         set({
           phase: 'arrived',
