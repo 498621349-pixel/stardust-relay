@@ -1,5 +1,5 @@
 #!/bin/bash
-***REMOVED***
+TOKEN="${VERCEL_TOKEN}"
 PROJECT="prj_H9zRWbOAbrBYnorEkZBvinxSevQV"
 VERCEL_API="https://api.vercel.com"
 
@@ -26,7 +26,7 @@ PAYEOF
 python3 <<PYEOF
 import subprocess, json, sys, os, base64, glob
 
-token = "$TOKEN"
+token = os.environ.get("VERCEL_TOKEN", "")
 project = "$PROJECT"
 
 # Find all source files
