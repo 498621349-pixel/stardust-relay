@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
-import { Zap, Wind, Hexagon, Bot, Command, RotateCcw } from 'lucide-react'
+import { Zap, Wind, Hexagon, Bot, Command, RotateCcw, Rocket, Unlock } from 'lucide-react'
 import { useGameStore } from '../store/gameStore'
+import { getContentUnlocks } from '../store/gameStore'
 
 interface ResourceBarProps {
   icon: React.ReactNode
@@ -58,7 +59,9 @@ export function ResourcePanel() {
   const score = useGameStore((s) => s.score)
   const servedCount = useGameStore((s) => s.servedCount)
   const day = useGameStore((s) => s.day)
-
+  const prestigeLevel = useGameStore((s) => s.prestigeLevel)
+  const totalPrestiges = useGameStore((s) => s.totalPrestiges)
+  const unlocks = getContentUnlocks(day, servedCount, totalPrestiges)
   const isEmergency = phase === 'emergency'
 
   return (
@@ -113,29 +116,42 @@ export function ResourcePanel() {
           <div className="flex items-center justify-between flex-wrap gap-1">
             <span className="text-[10px] text-text-secondary uppercase tracking-wider font-mono">运行模式</span>
             <div className="flex gap-1">
-              {(['eco', 'normal', 'overload'] as const).map((m) => (
-                <motion.button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  disabled={isEmergency && m !== 'eco'}
-                  className={`px-2 py-0.5 text-[9px] rounded border transition-all duration-200 font-mono whitespace-nowrap ${
-                    mode === m
-                      ? 'border-cyan-glow/50 bg-cyan-glow/15 text-cyan-glow'
-                      : isEmergency && m !== 'eco'
-                        ? 'border-white/5 text-text-dim/30 cursor-not-allowed'
-                        : 'border-white/10 text-text-secondary hover:border-cyan-glow/30 hover:text-cyan-glow/70'
-                  }`}
-                  whileHover={!isEmergency || m === 'eco' ? { scale: 1.05 } : {}}
-                  whileTap={!isEmergency || m === 'eco' ? { scale: 0.95 } : {}}
-                >
-                  {m === 'eco' ? '节能' : m === 'normal' ? '标准' : '超载'}
-                </motion.button>
-              ))}
+              {(['eco', 'normal', 'overload', 'pressure'] as const).map((m) => {
+                const isLocked = m === 'pressure' && !unlocks.pressureMode
+                const isActive = mode === m
+                return (
+                  <motion.button
+                    key={m}
+                    onClick={() => !isLocked && setMode(m)}
+                    disabled={isEmergency && m !== 'eco' || isLocked}
+                    className={`px-2 py-0.5 text-[9px] rounded border transition-all duration-200 font-mono whitespace-nowrap relative ${
+                      isActive
+                        ? 'border-red-500/50 bg-red-500/15 text-red-400'
+                        : isLocked
+                          ? 'border-white/5 text-text-dim/20 cursor-not-allowed'
+                          : isEmergency && m !== 'eco'
+                            ? 'border-white/5 text-text-dim/30 cursor-not-allowed'
+                            : 'border-white/10 text-text-secondary hover:border-cyan-glow/30 hover:text-cyan-glow/70'
+                    }`}
+                    whileHover={!isLocked && (!isEmergency || m === 'eco') ? { scale: 1.05 } : {}}
+                    whileTap={!isLocked && (!isEmergency || m === 'eco') ? { scale: 0.95 } : {}}
+                    title={isLocked ? '跃迁后解锁' : ''}
+                  >
+                    {m === 'eco' ? '节能' : m === 'normal' ? '标准' : m === 'overload' ? '超载' : '压力'}
+                    {isLocked && <Unlock size={8} className="inline ml-0.5 opacity-40" />}
+                  </motion.button>
+                )
+              })}
             </div>
           </div>
           <div className="text-[9px] text-text-dim font-mono mt-1 text-right">
-            {mode === 'eco' ? '-0.08/s' : mode === 'normal' ? '-0.18/s' : '-0.35/s'}
+            {mode === 'eco' ? '-0.08/s' : mode === 'normal' ? '-0.18/s' : mode === 'overload' ? '-0.35/s' : <span className="text-red-400/80">-0.60/s · 积分×1.5 · 天+2</span>}
           </div>
+          {mode === 'pressure' && (
+            <div className="text-[9px] text-red-400/50 font-mono mt-0.5 text-right">
+              容差 −5% · 加速进程 · 跃迁解锁
+            </div>
+          )}
         </div>
 
         {/* Automation shop */}
@@ -176,6 +192,76 @@ export function ResourcePanel() {
             )}
           </div>
         </div>
+
+        {/* v0.5 P1: 跃迁系统 */}
+        {(prestigeLevel > 0 || totalPrestiges > 0 || (day >= 30 && servedCount >= 15)) && (
+          <div className="mt-3 pt-3 border-t border-white/5">
+            <div className="text-[10px] text-text-secondary uppercase tracking-wider font-mono mb-2 flex items-center gap-1.5">
+              <Rocket size={11} className="text-cyan-glow/50" />
+              星际跃迁
+              {prestigeLevel > 0 && (
+                <span className="text-[9px] px-1 py-0.5 rounded bg-cyan-glow/10 text-cyan-glow/70">
+                  +{prestigeLevel * 5}%
+                </span>
+              )}
+            </div>
+            {prestigeLevel > 0 && (
+              <div className="flex gap-1 mb-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-1 flex-1 rounded-full ${i < prestigeLevel ? 'bg-cyan-glow/50' : 'bg-white/10'}`}
+                  />
+                ))}
+              </div>
+            )}
+            {day >= 30 && servedCount >= 15 ? (
+              <div className="text-[10px] font-mono text-cyan-glow/60 bg-cyan-glow/5 border border-cyan-glow/10 rounded px-2 py-1.5 text-center mb-1.5">
+                跃迁协议就绪
+              </div>
+            ) : totalPrestiges > 0 ? (
+              <div className="text-[10px] font-mono text-text-dim/50 px-2 py-1">
+                已完成 {totalPrestiges} 次跃迁
+              </div>
+            ) : (
+              <div className="text-[10px] font-mono text-text-dim/50 px-2 py-1">
+                第 {day} 天 / {servedCount} 次治愈后可跃迁
+              </div>
+            )}
+</div>
+        )}
+
+        {/* v0.5 P2: 渐进内容解锁状态 */}
+        {(unlocks.backstoryFull || unlocks.crossRefDialogue || unlocks.relationshipNetwork) && (
+          <div className="mt-3 pt-3 border-t border-white/5">
+            <div className="text-[10px] text-text-secondary uppercase tracking-wider font-mono mb-2 flex items-center gap-1.5">
+              <Unlock size={11} className="text-yellow-400/50" />
+              已解锁内容
+            </div>
+            <div className="space-y-1">
+              {unlocks.backstoryFull && (
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-yellow-400/60">
+                  <span className="text-green-400/50">✓</span> 完整背景故事
+                </div>
+              )}
+              {unlocks.crossRefDialogue && (
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-yellow-400/60">
+                  <span className="text-green-400/50">✓</span> 访客对话引用
+                </div>
+              )}
+              {unlocks.relationshipNetwork && (
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-yellow-400/60">
+                  <span className="text-green-400/50">✓</span> 关系网络
+                </div>
+              )}
+              {unlocks.pressureMode && (
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-red-400/60">
+                  <span className="text-green-400/50">✓</span> 压力模式
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Danger zone */}
         <div className="mt-3 pt-3 border-t border-white/5">

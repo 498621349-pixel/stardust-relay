@@ -1,9 +1,15 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { Activity, Brain, Thermometer, CheckCircle, XCircle, Lightbulb, Snowflake, Flame, Radio, User, Palette, Rocket, Zap, Heart, BookOpen } from 'lucide-react'
 import { useGameStore } from '../store/gameStore'
-import { getAffectionTier } from '../store/gamePersist'
+import { getAffectionTier, NPC_BACKSTORIES } from '../store/gamePersist'
+import { getTolerance } from '../data/cards'
+import { getContentUnlocks } from '../store/gameStore'
 import { useState } from 'react'
-import type { NPC } from '../data/npcs'
+import { NPC_TEMPLATES } from '../data/npcs'
+
+const TIER_COLORS: Record<string, string> = {
+  '陌生': '#666', '相识': '#5EC0D8', '熟悉': '#AA64FF', '信任': '#FFD700',
+}
 
 // NPC 可视化组件
 function NPCVisual({ type, color, currentE, currentP, isSuccess, isFailed }: { type: string; color: string; currentE: number; currentP: number; isSuccess?: boolean; isFailed?: boolean }) {
@@ -158,17 +164,11 @@ function NPCVisual({ type, color, currentE, currentP, isSuccess, isFailed }: { t
 }
 
 // 访客档案一览（无访客时显示）
-function VisitorJournal() {
+function VisitorJournal({ unlocks }: { unlocks: ReturnType<typeof getContentUnlocks> }) {
   const npcStats = useGameStore((s) => s.npcStats)
-  const npcList: NPC[] = [
-    { id: 'frost', name: 'Unit-7749 "霜语"', type: '深空探索AI', avatarColor: '#00F2FF', targetX: 1.0, targetY: 0.5, targetZ: 1.0, currentE: 0.23, currentP: 0.67, intro: '', successLines: [], failLines: [] } as NPC,
-    { id: 'ember', name: 'AS-221 "烬星"', type: '货运飞船驾驶员', avatarColor: '#FF8C00', targetX: 0.4, targetY: 0.8, targetZ: 1.0, currentE: 0.89, currentP: 0.31, intro: '', successLines: [], failLines: [] } as NPC,
-    { id: 'echo', name: 'Signal-0 "回声"', type: '通讯中继站AI', avatarColor: '#AA64FF', targetX: 0.67, targetY: 0.67, targetZ: 0.67, currentE: 0.12, currentP: 0.54, intro: '', successLines: [], failLines: [] } as NPC,
-    { id: 'anchor', name: 'Dr. 陈 "锚点"', type: '冬眠宇航员', avatarColor: '#5EC0D8', targetX: 0.125, targetY: 1.0, targetZ: 0.5, currentE: 0.05, currentP: 0.82, intro: '', successLines: [], failLines: [] } as NPC,
-    { id: 'prism', name: 'Prism-7 "七色"', type: '艺术生成AI', avatarColor: '#FF6B9D', targetX: 0.75, targetY: 0.75, targetZ: 0.75, currentE: 0.76, currentP: 0.19, intro: '', successLines: [], failLines: [] } as NPC,
-  ]
+  const npcList = NPC_TEMPLATES
 
-  const tierColors: Record<string, string> = { '陌生': '#666', '相识': '#5EC0D8', '熟悉': '#AA64FF', '信任': '#FFD700' }
+  const tierColors = TIER_COLORS
 
   return (
     <div className="flex-1 flex flex-col">
@@ -182,6 +182,8 @@ function VisitorJournal() {
           const tier = getAffectionTier(stats?.successCount ?? 0)
           const tc = tierColors[tier]
           const unlocked = (stats?.successCount ?? 0) >= 1
+          const briefUnlocked = (stats?.successCount ?? 0) >= 1
+          const detailUnlocked = (stats?.successCount ?? 0) >= 5
           return (
             <div key={n.id} className="flex items-center gap-2 px-2 py-1.5 rounded border border-white/5 bg-white/[0.02]">
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: unlocked ? tc : '#333', boxShadow: unlocked ? `0 0 4px ${tc}` : 'none' }} />
@@ -189,6 +191,22 @@ function VisitorJournal() {
                 <div className="text-[11px] font-mono truncate" style={{ color: unlocked ? n.avatarColor : '#555' }}>
                   {n.name.split('"')[0]}
                 </div>
+                {briefUnlocked && (
+                  unlocks.backstoryFull && NPC_BACKSTORIES[n.id]?.[1] ? (
+                    <div className="text-[9px] text-text-dim/40 font-mono mt-0.5 leading-tight">
+                      {NPC_BACKSTORIES[n.id]?.[1].brief}
+                    </div>
+                  ) : NPC_BACKSTORIES[n.id]?.[0] ? (
+                    <div className="text-[9px] text-text-dim/40 font-mono truncate mt-0.5">
+                      {NPC_BACKSTORIES[n.id]?.[0].brief}
+                    </div>
+                  ) : null
+                )}
+                {unlocks.relationshipNetwork && unlocks.relationshipNetwork && n.relationships.length > 0 && (
+                  <div className="text-[9px] text-cyan-glow/30 font-mono mt-0.5 truncate">
+                    关联: {n.relationships.map(r => NPC_TEMPLATES.find(t => t.id === r)?.name.split('"')[0] ?? r).join(', ')}
+                  </div>
+                )}
               </div>
               <span className="text-[9px] font-mono flex-shrink-0 px-1.5 py-0.5 rounded" style={{ color: tc, backgroundColor: `${tc}15`, border: `1px solid ${tc}30` }}>
                 {tier}
@@ -196,9 +214,15 @@ function VisitorJournal() {
               {stats && (
                 <span className="text-[9px] text-text-dim/60 font-mono flex-shrink-0">{stats.successCount}✓</span>
               )}
+              {(detailUnlocked || unlocks.backstoryFull) && (
+                <span className="text-[9px] text-yellow-400/60 font-mono flex-shrink-0" title="完整背景已解锁">✦</span>
+              )}
             </div>
           )
         })}
+      </div>
+      <div className="mt-2 pt-2 border-t border-white/5 text-[9px] text-text-dim/30 font-mono text-center">
+        {unlocks.backstoryFull ? '✦ 完整背景已解锁 · 跃迁加速解锁' : unlocks.crossRefDialogue ? '对话引用已解锁' : '第7天解锁完整背景'}
       </div>
     </div>
   )
@@ -209,7 +233,12 @@ export function NPCScanner() {
   const phase = useGameStore((s) => s.phase)
   const resultParams = useGameStore((s) => s.resultParams)
   const npcStats = useGameStore((s) => s.npcStats)
+  const day = useGameStore((s) => s.day)
+  const servedCount = useGameStore((s) => s.servedCount)
+  const totalPrestiges = useGameStore((s) => s.totalPrestiges)
   const [showJournal, setShowJournal] = useState(false)
+
+  const unlocks = getContentUnlocks(day, servedCount, totalPrestiges)
 
   const hasNPC = npc !== null
   const isSuccess = phase === 'success'
@@ -218,20 +247,15 @@ export function NPCScanner() {
 
   const currentStats = npc ? (npcStats[npc.id] ?? { successCount: 0, failCount: 0 }) : null
   const currentTier = currentStats ? getAffectionTier(currentStats.successCount) : '陌生'
-  const tierColors: Record<string, string> = { '陌生': '#666', '相识': '#5EC0D8', '熟悉': '#AA64FF', '信任': '#FFD700' }
+  const tierColors = TIER_COLORS
   const tierColor = tierColors[currentTier]
   const hasUnlocked = (currentStats?.successCount ?? 0) >= 1
 
   const getHint = () => {
     if (!npc) return ''
-    const hints: Record<string, string> = {
-      frost: '提示: 需要强化 X 和 Z。尝试连续使用 [循环] 后接 [增强]。',
-      ember: '提示: Y 轴需要升高，X 轴需要降低。[分流] 提升 Y，[增强] 提升 Z。',
-      echo: '提示: 三轴需要完全相等。先用 [循环] 提升数值，再用 [滤波] 均衡。',
-      anchor: '提示: 需要大幅降低 X，大幅提升 Y。多次使用 [分流]。',
-      prism: '提示: 三轴趋向 0.75。先用 [循环]+[增强] 提升，再用 [滤波] 拉平。',
-    }
-    return hints[npc.id] || ''
+    const sessionFails = useGameStore.getState().failCountThisSession?.[npc.id] ?? 0
+    const isExperienced = sessionFails >= 2
+    return isExperienced ? npc.hintDirect : npc.hintSoft
   }
 
   return (
@@ -275,7 +299,7 @@ export function NPCScanner() {
       {/* 访客档案一览（无访客时显示） */}
       {showJournal && !hasNPC ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <VisitorJournal />
+          <VisitorJournal unlocks={unlocks} />
         </motion.div>
       ) : (
         <AnimatePresence mode="wait">
@@ -331,7 +355,7 @@ export function NPCScanner() {
                   <ParamLabel label="Y" target={npc.targetY} actual={resultParams?.y} color="#5EC0D8" />
                   <ParamLabel label="Z" target={npc.targetZ} actual={resultParams?.z} color="#AA64FF" />
                 </div>
-                <div className="text-[9px] text-text-dim/50 font-mono mt-2 truncate">容差范围: ±30%</div>
+                <div className="text-[9px] text-text-dim/50 font-mono mt-2 truncate">容差: ±{(getTolerance(useGameStore.getState().day) * 100).toFixed(0)}%</div>
               </div>
             </motion.div>
           ) : (

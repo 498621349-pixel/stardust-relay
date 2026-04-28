@@ -68,6 +68,22 @@ export const LOGIC_CARDS: LogicCard[] = [
       z: p.z + (0.5 - p.z) * 0.5,
     }),
   },
+  {
+    id: 'anchor',
+    name: '[锚定]',
+    desc: 'Anchor',
+    color: '#FFD700',
+    effect: 'Y − 0.4',
+    apply: (p) => ({ ...p, y: Math.max(0, p.y - 0.4) }),
+  },
+  {
+    id: 'half',
+    name: '[半衰]',
+    desc: 'Half',
+    color: '#FF69B4',
+    effect: 'Y × 0.5',
+    apply: (p) => ({ ...p, y: p.y * 0.5 }),
+  },
 ]
 
 export function calculateResult(
@@ -112,12 +128,16 @@ export function checkSuccess(
  * day 6-15: 30%  (默认)
  * day 16-30: 25%
  * day 31+:  20%  (硬核)
+ * v0.5 P1: 跃迁系统永久加成（+5%/层，上限5层 = +25%）
  */
-export function getTolerance(day: number): number {
-  if (day <= 5) return 0.35
-  if (day <= 15) return 0.30
-  if (day <= 30) return 0.25
-  return 0.20
+export function getTolerance(day: number, prestigeLevel = 0): number {
+  let base: number
+  if (day <= 5) base = 0.35
+  else if (day <= 15) base = 0.30
+  else if (day <= 30) base = 0.25
+  else base = 0.20
+  const bonus = Math.min(prestigeLevel, 5) * 0.05
+  return Math.min(base + bonus, 1.0)
 }
 
 /**

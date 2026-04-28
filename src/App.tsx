@@ -7,20 +7,27 @@ import { LogicMixer } from './components/LogicMixer'
 import { DialogBox } from './components/DialogBox'
 import { GameLog } from './components/GameLog'
 import { useGameLoop } from './hooks/useGameLoop'
-import { useSpeech } from './hooks/useSpeech'
 import { useSound } from './hooks/useSound'
 import { useBGM } from './hooks/useBGM'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useGameStore } from './store/gameStore'
 import { AchievementUI, AchievementBadge } from './components/AchievementUI'
-import { RotateCcw, Volume2, VolumeX, Moon, Sun, Music, Music2 } from 'lucide-react'
+import { TutorialSystem } from './components/TutorialSystem'
+import { PrestigeReview } from './components/PrestigeReview'
+import { OfflineReport } from './components/OfflineReport'
+import { VisitorQueuePicker } from './components/VisitorQueuePicker'
+import { RotateCcw, VolumeX, Moon, Sun, Music2 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { GamePhase } from './store/gameStore'
 
 function GameOverOverlay() {
+  function handleRestart() {
+    useGameStore.getState().resetGame()
+  }
+
   return (
     <motion.div
-      className="absolute inset-0 z-50 flex items-center justify-center bg-deep-space/90 backdrop-blur-sm"
+      className="absolute inset-0 z-[60] flex items-center justify-center bg-deep-space/90 backdrop-blur-sm"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 2 }}
@@ -37,8 +44,8 @@ function GameOverOverlay() {
           能源耗尽。星尘驿站进入永久休眠。
         </div>
         <button
-          onClick={() => window.location.reload()}
-          className="flex items-center gap-2 mx-auto px-4 py-2 rounded border border-cyan-glow/20 text-cyan-glow/40 text-[11px] font-mono tracking-wider hover:border-cyan-glow/40 hover:text-cyan-glow/60 transition-all"
+          onClick={handleRestart}
+          className="flex items-center gap-2 mx-auto px-4 py-2 rounded border border-cyan-glow/20 text-cyan-glow/40 text-[11px] font-mono tracking-wider hover:border-cyan-glow/40 hover:text-cyan-glow/60 transition-all cursor-pointer active:scale-95"
         >
           <RotateCcw size={12} />
           重启系统
@@ -53,32 +60,31 @@ function App() {
   useKeyboardShortcuts()
 
   const phase = useGameStore((s) => s.phase)
-  const speechEnabled = useGameStore((s) => s.speechEnabled)
   const isResting = useGameStore((s) => s.isResting)
   const soundEnabled = useGameStore((s) => s.soundEnabled)
-  const bgmEnabled = useGameStore((s) => s.bgmEnabled)
-  const toggleSpeech = useGameStore((s) => s.toggleSpeech)
+  const tutorialActive = useGameStore((s) => s.tutorialActive)
   const toggleRest = useGameStore((s) => s.toggleRest)
-  const toggleSound = useGameStore((s) => s.toggleSound)
-  const toggleBGM = useGameStore((s) => s.toggleBGM)
-  const { isSpeaking } = useSpeech()
-  const { play, setEnabled } = useSound()
+  const toggleAudio = useGameStore((s) => s.toggleAudio)
+  const completeTutorial = useGameStore((s) => s.completeTutorial)
+  const setTutorialActive = useGameStore((s) => s.setTutorialActive)
+  const { play } = useSound()
   const resources = useGameStore((s) => s.resources)
-  const { setVibe, toggleBGM: bgmToggle, isPlaying } = useBGM()
+  const { setVibe } = useBGM()
 
-  // 同步音效开关状态
-  useEffect(() => {
-    setEnabled(soundEnabled)
-  }, [soundEnabled, setEnabled])
+  // v0.5 P1: 自动检测跃迁资格并触发回顾
+  const day = useGameStore((s) => s.day)
+  const servedCount = useGameStore((s) => s.servedCount)
+  const sessionStats = useGameStore((s) => s.sessionStats)
+  const prestigeReviewRef = useRef(false)
 
-  // BGM 开关与相位切换
   useEffect(() => {
-    if (!bgmEnabled) {
-      if (isPlaying()) bgmToggle()
-    } else {
-      if (!isPlaying()) bgmToggle()
+    if (prestigeReviewRef.current) return
+    if (day >= 30 && servedCount >= 15 && sessionStats.totalServed > 0) {
+      prestigeReviewRef.current = true
     }
-  }, [bgmEnabled]) // eslint-disable-line
+  }, [day, servedCount, sessionStats.totalServed])
+
+  // 音频总开关：音效开关同步到音效/Speech 模块，BGM 由 useBGM 内部订阅 soundEnabled
 
   // 根据游戏状态切换 BGM 氛围
   useEffect(() => {
@@ -89,8 +95,6 @@ function App() {
     setVibe(nextVibe)
   }, [phase, isResting]) // eslint-disable-line
 
-  const isGameOver = phase === 'gameover'
-
   // 追踪 phase 跳转，触发一次性音效
   const prevPhaseRef = useRef<GamePhase>(phase)
   const prevEnergyRef = useRef(resources.energy)
@@ -100,7 +104,7 @@ function App() {
       else if (phase === 'gameover') play('gameover')
       prevPhaseRef.current = phase
     }
-    // 能源 <5% 预警音效（仅在进入临界时触发一次）
+    // 能源 <5% 低能警告音效（仅在进入临界时触发一次）
     if (prevEnergyRef.current >= 5 && resources.energy < 5 && soundEnabled) {
       play('emergency_critical')
     }
@@ -173,58 +177,29 @@ function App() {
         </HolographicPanel>
       </div>
 
-      {/* Control buttons - right-aligned — icon-only on mobile */}
+      {/* Control buttons - right-aligned */}
       <div className="absolute top-2 right-2 sm:top-8 sm:right-8 z-50 flex flex-col gap-1 sm:gap-2">
         <AchievementBadge />
-        {/* BGM toggle button */}
-        <motion.button
-          className={`flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border transition-all ${
-            bgmEnabled
-              ? 'border-purple-400/40 bg-purple-400/10 text-purple-400/90'
-              : 'border-white/10 bg-white/5 text-text-dim hover:border-white/20'
-          }`}
-          onClick={toggleBGM}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <Music2 size={16} />
-          <span className="text-[9px] sm:text-[11px] font-mono hidden sm:inline">{bgmEnabled ? 'BGM' : 'BGM关'}</span>
-        </motion.button>
 
-        {/* Sound toggle button */}
+        {/* Audio toggle (unified BGM + SFX + Speech) */}
         <motion.button
           className={`flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border transition-all ${
             soundEnabled
               ? 'border-cyan-glow/40 bg-cyan-glow/10 text-cyan-glow'
               : 'border-white/10 bg-white/5 text-text-dim hover:border-white/20'
           }`}
-          onClick={toggleSound}
+          onClick={toggleAudio}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <Music size={16} />
-          <span className="text-[9px] sm:text-[11px] font-mono hidden sm:inline">{soundEnabled ? '音效' : '静音'}</span>
-        </motion.button>
-
-        {/* Speech toggle button */}
-        <motion.button
-          className={`flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border transition-all ${
-            speechEnabled
-              ? 'border-cyan-glow/40 bg-cyan-glow/10 text-cyan-glow'
-              : 'border-white/10 bg-white/5 text-text-dim hover:border-white/20'
-          }`}
-          onClick={toggleSpeech}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          {speechEnabled ? (
+          {soundEnabled ? (
             <>
-              <Volume2 size={16} className={isSpeaking() ? 'animate-pulse' : ''} />
-              <span className="text-[9px] sm:text-[11px] font-mono hidden sm:inline">语音开</span>
+              <Music2 size={14} />
+              <span className="text-[9px] sm:text-[11px] font-mono hidden sm:inline">音效</span>
             </>
           ) : (
             <>
-              <VolumeX size={16} />
+              <VolumeX size={14} />
               <span className="text-[9px] sm:text-[11px] font-mono hidden sm:inline">静音</span>
             </>
           )}
@@ -258,9 +233,28 @@ function App() {
       {/* Achievement popup */}
       <AchievementUI />
 
+      {/* v0.5 P1: 跃迁系统 */}
+      <PrestigeReview />
+
+      {/* v0.5 P1: 离线报告 */}
+      <OfflineReport />
+
+      {/* v0.5 P1: 访客冲突队列选择器 */}
+      <VisitorQueuePicker />
+
+      {/* Tutorial overlay */}
+      <AnimatePresence>
+        {tutorialActive && (
+          <TutorialSystem onComplete={() => {
+            setTutorialActive(false)
+            completeTutorial()
+          }} />
+        )}
+      </AnimatePresence>
+
       {/* Game Over overlay */}
       <AnimatePresence>
-        {isGameOver && <GameOverOverlay />}
+        {phase === 'gameover' && <GameOverOverlay />}
       </AnimatePresence>
     </div>
   )

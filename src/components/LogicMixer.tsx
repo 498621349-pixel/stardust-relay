@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { RotateCcw, Play, Loader2, ChevronRight, Save, Trash2, Zap, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react'
 import { useGameStore } from '../store/gameStore'
-import { LOGIC_CARDS, calculateResult } from '../data/cards'
+import { LOGIC_CARDS, calculateResult, getTolerance } from '../data/cards'
 import { useSound } from '../hooks/useSound'
 import { getAffectionTier } from '../store/gamePersist'
 import { useEffect, useRef, useState } from 'react'
@@ -25,6 +25,8 @@ export function LogicMixer() {
   const deleteMacro = useGameStore((s) => s.deleteMacro)
   const applyMacro = useGameStore((s) => s.applyMacro)
   const npcStats = useGameStore((s) => s.npcStats)
+  const day = useGameStore((s) => s.day)
+  const prestigeLevel = useGameStore((s) => s.prestigeLevel)
   const { play, setEnabled } = useSound()
 
   const [macroExpanded, setMacroExpanded] = useState(true)
@@ -37,14 +39,7 @@ export function LogicMixer() {
 
   const getHint = () => {
     if (!npc) return ''
-    const hints: Record<string, string> = {
-      frost: '提示: 需要强化 X 和 Z。尝试连续使用 [循环] 后接 [增强]。',
-      ember: '提示: Y 轴需要升高，X 轴需要降低。[分流] 提升 Y，[增强] 提升 Z。',
-      echo: '提示: 三轴需要完全相等。先用 [循环] 提升数值，再用 [滤波] 均衡。',
-      anchor: '提示: 需要大幅降低 X，大幅提升 Y。多次使用 [分流]。',
-      prism: '提示: 三轴趋向 0.75。先用 [循环]+[增强] 提升，再用 [滤波] 拉平。',
-    }
-    return hints[npc.id] || ''
+    return npc.hintSoft
   }
 
   // 同步音效开关状态（避免渲染时调用 setState）
@@ -110,24 +105,42 @@ export function LogicMixer() {
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] sm:text-[14px] font-mono font-medium" style={{ color: npc.avatarColor }}>
-                {npc.name}
-              </span>
-              {currentTier !== '陌生' && (
-                <span className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `${tierColor}50`, backgroundColor: `${tierColor}12` }}>
-                  {currentTier}
-                </span>
-              )}
+          {/* Row 1: 名称 + XYZ 当前值 */}
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[12px] sm:text-[14px] font-mono font-medium" style={{ color: npc.avatarColor }}>
+              {npc.name}
+            </span>
+            <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-[11px] tabular-nums">
+              <span className="text-[#00F2FF]/60">X</span>
+              <span className="text-text-secondary">{(npc.currentX ?? 0.5).toFixed(2)}</span>
+              <span className="text-[#5EC0D8]/60">Y</span>
+              <span className="text-text-secondary">{(npc.currentY ?? 0.5).toFixed(2)}</span>
+              <span className="text-[#AA64FF]/60">Z</span>
+              <span className="text-text-secondary">{(npc.currentZ ?? 0.5).toFixed(2)}</span>
             </div>
-            <div className="text-[9px] sm:text-[10px] text-text-secondary font-mono">{npc.type}</div>
           </div>
-          <div className="flex items-start gap-1.5">
+
+          {/* Row 2: 容差 + 身份 + 好感度 */}
+          <div className="flex items-center gap-3 mb-1.5">
+            <span className="text-[9px] sm:text-[10px] font-mono text-cyan-glow/50 border border-cyan-glow/20 px-1.5 py-0.5 rounded">
+              容差 ±{((getTolerance(day, prestigeLevel)) * 100).toFixed(0)}%
+            </span>
+            <span className="text-[9px] sm:text-[10px] text-text-dim/60 font-mono">{npc.type}</span>
+            {currentTier !== '陌生' && (
+              <span className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded-full border ml-auto" style={{ color: tierColor, borderColor: `${tierColor}50`, backgroundColor: `${tierColor}12` }}>
+                {currentTier}
+              </span>
+            )}
+          </div>
+
+          {/* Row 3: 提示语 */}
+          <div className="flex items-start gap-1.5 mb-2">
             <Lightbulb size={12} className="text-cyan-glow/50 flex-shrink-0 mt-0.5" />
             <span className="text-[9px] sm:text-[10px] text-cyan-glow/60 font-mono leading-relaxed">{getHint()}</span>
           </div>
-          <div className="flex gap-3 mt-2">
+
+          {/* Row 4: E/P 状态条 */}
+          <div className="flex gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-[9px] text-text-dim font-mono mb-0.5">情绪 E</div>
               <div className="h-1 bg-white/5 rounded-full overflow-hidden">
@@ -140,11 +153,6 @@ export function LogicMixer() {
                 <div className="h-full rounded-full bg-orange-400/50" style={{ width: `${npc.currentP * 100}%` }} />
               </div>
             </div>
-          </div>
-          <div className="flex gap-2 mt-2">
-            <ParamMini label="X" value={npc.targetX} color="#00F2FF" />
-            <ParamMini label="Y" value={npc.targetY} color="#5EC0D8" />
-            <ParamMini label="Z" value={npc.targetZ} color="#AA64FF" />
           </div>
         </motion.div>
       )}
@@ -216,8 +224,8 @@ export function LogicMixer() {
             animate={{ opacity: 1, x: 0 }}
           >
             <div className="text-[11px] text-text-secondary uppercase tracking-wider font-mono mb-2 flex justify-between items-center">
-              <span>当前调制预览</span>
-              <span className="text-[9px] text-text-dim/60 normal-case tracking-normal">目标 vs 实际</span>
+              <span>调制预览</span>
+              <span className="text-[9px] text-text-dim/60 normal-case tracking-normal">目标 → 预览</span>
             </div>
             <div className="flex gap-4 text-[11px] font-mono">
               <PreviewAxis label="X" target={target.x} actual={preview.x} color="#00F2FF" />
@@ -284,7 +292,8 @@ export function LogicMixer() {
       {/* Available Cards */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="text-[10px] sm:text-[11px] text-text-secondary uppercase tracking-wider font-mono mb-2 flex-shrink-0">可用逻辑卡片</div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2 flex-1 content-start">
+        <div className="flex-1 overflow-y-auto content-start">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2">
           {LOGIC_CARDS.map((card) => (
             <motion.button
               key={card.id}
@@ -310,6 +319,7 @@ export function LogicMixer() {
               <span className="text-[9px] text-text-secondary font-mono">{card.effect}</span>
             </motion.button>
           ))}
+        </div>
         </div>
       </div>
 
@@ -500,15 +510,6 @@ function PreviewAxis({ label, target, actual, color }: { label: string; target: 
       }`}>
         {isExact ? '完美' : isClose ? '接近' : '偏差'}
       </span>
-    </div>
-  )
-}
-
-function ParamMini({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="flex-1 min-w-0 px-1 py-1 rounded border border-white/5 bg-white/[0.02] text-center overflow-hidden">
-      <div style={{ color }} className="text-[9px] sm:text-[10px] font-medium mb-0.5 truncate">{label}</div>
-      <div className="text-[9px] sm:text-[10px] text-text-primary font-mono tabular-nums truncate">{value.toFixed(2)}</div>
     </div>
   )
 }
