@@ -27,7 +27,7 @@ export interface PersistedGameData {
   macroUnlocked: boolean
   macros: MacroData[]
   npcStats: Record<string, NpcStats>
-  mode: 'eco' | 'normal' | 'overload'
+mode: 'eco' | 'normal' | 'overload' | 'pressure'
   soundEnabled: boolean
   speechEnabled: boolean
   isResting: boolean
@@ -309,6 +309,9 @@ function defaultData(): PersistedGameData {
     servedCount: 0,
     day: 1,
     autoCollectors: 0,
+    prestigeLevel: 0,
+    totalPrestiges: 0,
+    pendingVisitors: [],
     macroUnlocked: false,
     macros: [],
     npcStats: {},

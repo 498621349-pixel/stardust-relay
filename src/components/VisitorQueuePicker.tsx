@@ -6,7 +6,6 @@ export function VisitorQueuePicker() {
   const pendingVisitors = useGameStore((s) => s.pendingVisitors)
   const acceptVisitor = useGameStore((s) => s.acceptVisitor)
   const rejectVisitor = useGameStore((s) => s.rejectVisitor)
-  const phase = useGameStore((s) => s.phase)
 
   if (pendingVisitors.length === 0) return null
 

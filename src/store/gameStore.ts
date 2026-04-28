@@ -400,7 +400,7 @@ function nowTime(): string {
 }
 
 // v0.5 P2: 渐进内容解锁条件
-export function getContentUnlocks(day: number, servedCount: number, totalPrestiges: number) {
+export function getContentUnlocks(day: number, _servedCount: number, totalPrestiges: number) {
   return {
     // Day 7+: 解锁访客档案的完整背景故事
     backstoryFull: day >= 7 || totalPrestiges >= 1,
@@ -413,7 +413,7 @@ export function getContentUnlocks(day: number, servedCount: number, totalPrestig
   }
 }
 
-type PowerMode = 'eco' | 'normal' | 'overload' | 'pressure'
+export type PowerMode = 'eco' | 'normal' | 'overload' | 'pressure'
 
 export const useGameStore = create<GameState>()((set, get) =>
   ({
