@@ -69,7 +69,6 @@ export function LogicMixer() {
 
   // Calculate preview
   const preview = calculateResult(slots)
-  const target = npc ? { x: npc.targetX, y: npc.targetY, z: npc.targetZ } : null
 
   const handleSaveMacro = () => {
     if (!hasCards) return
@@ -105,12 +104,21 @@ export function LogicMixer() {
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          {/* Row 1: 名称 + XYZ 当前值 */}
-          <div className="flex items-center gap-2 mb-1.5">
+          {/* Row 1: 名称 + 容差 + 身份 + XYZ 当前值 */}
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="text-[12px] sm:text-[14px] font-mono font-medium" style={{ color: npc.avatarColor }}>
               {npc.name}
             </span>
-            <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-[11px] tabular-nums">
+            <span className="text-[9px] sm:text-[10px] font-mono text-cyan-glow/50 border border-cyan-glow/20 px-1.5 py-0.5 rounded">
+              容差 ±{((getTolerance(day, prestigeLevel)) * 100).toFixed(0)}%
+            </span>
+            <span className="text-[9px] sm:text-[10px] text-text-dim/60 font-mono">{npc.type}</span>
+            {currentTier !== '陌生' && (
+              <span className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `${tierColor}50`, backgroundColor: `${tierColor}12` }}>
+                {currentTier}
+              </span>
+            )}
+            <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-[11px] tabular-nums ml-auto">
               <span className="text-[#00F2FF]/60">X</span>
               <span className="text-text-secondary">{(npc.currentX ?? 0.5).toFixed(2)}</span>
               <span className="text-[#5EC0D8]/60">Y</span>
@@ -120,26 +128,13 @@ export function LogicMixer() {
             </div>
           </div>
 
-          {/* Row 2: 容差 + 身份 + 好感度 */}
-          <div className="flex items-center gap-3 mb-1.5">
-            <span className="text-[9px] sm:text-[10px] font-mono text-cyan-glow/50 border border-cyan-glow/20 px-1.5 py-0.5 rounded">
-              容差 ±{((getTolerance(day, prestigeLevel)) * 100).toFixed(0)}%
-            </span>
-            <span className="text-[9px] sm:text-[10px] text-text-dim/60 font-mono">{npc.type}</span>
-            {currentTier !== '陌生' && (
-              <span className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded-full border ml-auto" style={{ color: tierColor, borderColor: `${tierColor}50`, backgroundColor: `${tierColor}12` }}>
-                {currentTier}
-              </span>
-            )}
-          </div>
-
-          {/* Row 3: 提示语 */}
+          {/* Row 2: 提示语 */}
           <div className="flex items-start gap-1.5 mb-2">
             <Lightbulb size={12} className="text-cyan-glow/50 flex-shrink-0 mt-0.5" />
             <span className="text-[9px] sm:text-[10px] text-cyan-glow/60 font-mono leading-relaxed">{getHint()}</span>
           </div>
 
-          {/* Row 4: E/P 状态条 */}
+          {/* Row 3: E/P 状态条 */}
           <div className="flex gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-[9px] text-text-dim font-mono mb-0.5">情绪 E</div>
@@ -216,24 +211,30 @@ export function LogicMixer() {
           })}
         </div>
 
-        {/* Real-time Preview */}
-        {target && hasCards && !showResult && (
-          <motion.div
-            className="flex-1 bg-cyan-glow/5 rounded-lg border border-cyan-glow/15 p-3 flex flex-col justify-center"
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
-            <div className="text-[11px] text-text-secondary uppercase tracking-wider font-mono mb-2 flex justify-between items-center">
-              <span>调制预览</span>
-              <span className="text-[9px] text-text-dim/60 normal-case tracking-normal">目标 → 预览</span>
-            </div>
-            <div className="flex gap-4 text-[11px] font-mono">
-              <PreviewAxis label="X" target={target.x} actual={preview.x} color="#00F2FF" />
-              <PreviewAxis label="Y" target={target.y} actual={preview.y} color="#5EC0D8" />
-              <PreviewAxis label="Z" target={target.z} actual={preview.z} color="#AA64FF" />
-            </div>
-          </motion.div>
-        )}
+        {/* Real-time Preview — always visible */}
+        <motion.div
+          className="flex-1 bg-cyan-glow/5 rounded-lg border border-cyan-glow/15 p-3 flex flex-col justify-center"
+        >
+          <div className="text-[11px] text-text-secondary uppercase tracking-wider font-mono mb-2 flex justify-between items-center">
+            <span>调制预览</span>
+            <span className="text-[9px] text-text-dim/60 normal-case tracking-normal">目标 → 预览</span>
+          </div>
+          <div className="flex gap-4 text-[11px] font-mono">
+            {npc ? (
+              <>
+                <PreviewAxis label="X" target={npc.targetX} actual={preview.x} color="#00F2FF" />
+                <PreviewAxis label="Y" target={npc.targetY} actual={preview.y} color="#5EC0D8" />
+                <PreviewAxis label="Z" target={npc.targetZ} actual={preview.z} color="#AA64FF" />
+              </>
+            ) : (
+              <>
+                <PreviewAxis label="X" target={null} actual={null} color="#00F2FF" />
+                <PreviewAxis label="Y" target={null} actual={null} color="#5EC0D8" />
+                <PreviewAxis label="Z" target={null} actual={null} color="#AA64FF" />
+              </>
+            )}
+          </div>
+        </motion.div>
       </div>
 
       {/* Brewing progress */}
@@ -484,30 +485,36 @@ function MacroButton({
   )
 }
 
-function PreviewAxis({ label, target, actual, color }: { label: string; target: number; actual: number; color: string }) {
+function PreviewAxis({ label, target, actual, color }: { label: string; target: number | null; actual: number | null; color: string }) {
+  if (target === null || actual === null) {
+    return (
+      <div className="flex flex-col items-center flex-1">
+        <span style={{ color }} className="text-[12px] font-medium">{label}</span>
+        <div className="flex items-baseline gap-1">
+          <span className="text-[10px] text-text-dim/40">--</span>
+          <span className="text-[9px] text-text-dim/20">→</span>
+          <span className="text-[12px] font-mono tabular-nums text-text-dim/40">--</span>
+        </div>
+        <span className="text-[9px] mt-1 px-2 py-0.5 rounded text-text-dim/30">待命中</span>
+      </div>
+    )
+  }
+
   const error = Math.abs(actual - target) / target
   const isClose = error <= 0.30
   const isExact = error <= 0.05
 
   return (
     <div className="flex flex-col items-center flex-1">
-      <span style={{ color }} className="text-[12px] font-medium">
-        {label}
-      </span>
+      <span style={{ color }} className="text-[12px] font-medium">{label}</span>
       <div className="flex items-baseline gap-1">
         <span className="text-[10px] text-text-dim/60">{target.toFixed(2)}</span>
         <span className="text-[9px] text-text-dim/30">→</span>
-        <span
-          className={`text-[12px] font-mono tabular-nums ${
-            isExact ? 'text-cyan-glow' : isClose ? 'text-cyan-glow/70' : 'text-alert-orange/80'
-          }`}
-        >
+        <span className={`text-[12px] font-mono tabular-nums ${isExact ? 'text-cyan-glow' : isClose ? 'text-cyan-glow/70' : 'text-alert-orange/80'}`}>
           {actual.toFixed(2)}
         </span>
       </div>
-      <span className={`text-[9px] mt-1 px-2 py-0.5 rounded whitespace-nowrap ${
-        isExact ? 'text-cyan-glow/60 bg-cyan-glow/10' : isClose ? 'text-cyan-glow/50 bg-cyan-glow/5' : 'text-alert-orange/60 bg-alert-orange/5'
-      }`}>
+      <span className={`text-[9px] mt-1 px-2 py-0.5 rounded whitespace-nowrap ${isExact ? 'text-cyan-glow/60 bg-cyan-glow/10' : isClose ? 'text-cyan-glow/50 bg-cyan-glow/5' : 'text-alert-orange/60 bg-alert-orange/5'}`}>
         {isExact ? '完美' : isClose ? '接近' : '偏差'}
       </span>
     </div>
