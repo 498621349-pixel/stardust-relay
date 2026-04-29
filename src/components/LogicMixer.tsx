@@ -97,60 +97,64 @@ export function LogicMixer() {
         </div>
       </div>
 
-      {/* Mobile: Inline visitor info panel */}
-      {npc && !showResult && (
-        <motion.div
-          className="mb-2 sm:mb-3 p-2 sm:p-3 rounded-lg border border-cyan-glow/15 bg-cyan-glow/5"
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          {/* Row 1: 名称 + 容差 + 身份 + XYZ 当前值 */}
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <span className="text-[12px] sm:text-[14px] font-mono font-medium" style={{ color: npc.avatarColor }}>
-              {npc.name}
-            </span>
-            <span className="text-[9px] sm:text-[10px] font-mono text-cyan-glow/50 border border-cyan-glow/20 px-1.5 py-0.5 rounded">
-              容差 ±{((getTolerance(day, prestigeLevel)) * 100).toFixed(0)}%
-            </span>
-            <span className="text-[9px] sm:text-[10px] text-text-dim/60 font-mono">{npc.type}</span>
-            {currentTier !== '陌生' && (
-              <span className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `${tierColor}50`, backgroundColor: `${tierColor}12` }}>
-                {currentTier}
+      {/* Visitor info panel — always visible */}
+      <div className="mb-2 sm:mb-3 p-2 sm:p-3 rounded-lg border border-cyan-glow/15 bg-cyan-glow/5">
+        {npc ? (
+          <>
+            {/* Row 1: 名称 + 容差 + 身份 + 好感度 + XYZ 当前值 */}
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span className="text-[12px] sm:text-[14px] font-mono font-medium" style={{ color: npc.avatarColor }}>
+                {npc.name}
               </span>
-            )}
-            <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-[11px] tabular-nums ml-auto">
-              <span className="text-[#00F2FF]/60">X</span>
-              <span className="text-text-secondary">{(npc.currentX ?? 0.5).toFixed(2)}</span>
-              <span className="text-[#5EC0D8]/60">Y</span>
-              <span className="text-text-secondary">{(npc.currentY ?? 0.5).toFixed(2)}</span>
-              <span className="text-[#AA64FF]/60">Z</span>
-              <span className="text-text-secondary">{(npc.currentZ ?? 0.5).toFixed(2)}</span>
-            </div>
-          </div>
-
-          {/* Row 2: 提示语 */}
-          <div className="flex items-start gap-1.5 mb-2">
-            <Lightbulb size={12} className="text-cyan-glow/50 flex-shrink-0 mt-0.5" />
-            <span className="text-[9px] sm:text-[10px] text-cyan-glow/60 font-mono leading-relaxed">{getHint()}</span>
-          </div>
-
-          {/* Row 3: E/P 状态条 */}
-          <div className="flex gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="text-[9px] text-text-dim font-mono mb-0.5">情绪 E</div>
-              <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full rounded-full bg-cyan-glow/50" style={{ width: `${npc.currentE * 100}%` }} />
+              <span className="text-[9px] sm:text-[10px] font-mono text-cyan-glow/50 border border-cyan-glow/20 px-1.5 py-0.5 rounded">
+                容差 ±{((getTolerance(day, prestigeLevel)) * 100).toFixed(0)}%
+              </span>
+              <span className="text-[9px] sm:text-[10px] text-text-dim/60 font-mono">{npc.type}</span>
+              {currentTier !== '陌生' && (
+                <span className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `${tierColor}50`, backgroundColor: `${tierColor}12` }}>
+                  {currentTier}
+                </span>
+              )}
+              <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-[11px] tabular-nums ml-auto">
+                <span className="text-[#00F2FF]/60">X</span>
+                <span className="text-text-secondary">{(npc.currentX ?? 0.5).toFixed(2)}</span>
+                <span className="text-[#5EC0D8]/60">Y</span>
+                <span className="text-text-secondary">{(npc.currentY ?? 0.5).toFixed(2)}</span>
+                <span className="text-[#AA64FF]/60">Z</span>
+                <span className="text-text-secondary">{(npc.currentZ ?? 0.5).toFixed(2)}</span>
               </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[9px] text-text-dim font-mono mb-0.5">逻辑缺损 P</div>
-              <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full rounded-full bg-orange-400/50" style={{ width: `${npc.currentP * 100}%` }} />
+
+            {/* Row 2: 提示语 */}
+            <div className="flex items-start gap-1.5 mb-2">
+              <Lightbulb size={12} className="text-cyan-glow/50 flex-shrink-0 mt-0.5" />
+              <span className="text-[9px] sm:text-[10px] text-cyan-glow/60 font-mono leading-relaxed">{getHint()}</span>
+            </div>
+
+            {/* Row 3: E/P 状态条 */}
+            <div className="flex gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-[9px] text-text-dim font-mono mb-0.5">情绪 E</div>
+                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-cyan-glow/50" style={{ width: `${npc.currentE * 100}%` }} />
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[9px] text-text-dim font-mono mb-0.5">逻辑缺损 P</div>
+                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-orange-400/50" style={{ width: `${npc.currentP * 100}%` }} />
+                </div>
               </div>
             </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-center h-16 sm:h-20">
+            <span className="text-[11px] sm:text-[12px] text-text-dim/50 font-mono tracking-wider">
+              {phase === 'scanning' ? '正在解析信号...' : '暂无访客信号 · 等待深空扫描...'}
+            </span>
           </div>
-        </motion.div>
-      )}
+        )}
+      </div>
 
       {/* Slots and Preview Row */}
       <div className="flex gap-2 sm:gap-4 flex-shrink-0 mb-2 sm:mb-3 h-20 sm:h-28">
