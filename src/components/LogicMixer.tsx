@@ -337,37 +337,35 @@ export function LogicMixer() {
         </motion.div>
       )}
 
-      {/* Available Cards */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <div className="text-[10px] sm:text-[11px] text-text-secondary uppercase tracking-wider font-mono mb-2 flex-shrink-0">可用逻辑卡片</div>
-        <div className="flex-1 overflow-y-auto content-start">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2">
+      {/* Available Cards — single row, always visible */}
+      <div className="flex-shrink-0">
+        <div className="text-[9px] sm:text-[10px] text-text-dim/60 font-mono mb-1.5 uppercase tracking-wider">可用逻辑卡片</div>
+        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto">
           {LOGIC_CARDS.map((card) => (
             <motion.button
               key={card.id}
               onClick={() => canInteract && (play('cardPlace'), placeCard(card.id))}
               disabled={!canInteract}
-              className={`relative p-2.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-1 ${
-                canInteract ? 'hover:brightness-110 hover:-translate-y-0.5' : 'opacity-40 cursor-not-allowed'
+              className={`relative flex-shrink-0 w-14 sm:w-16 h-14 sm:h-16 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
+                canInteract ? 'hover:brightness-110' : 'opacity-40 cursor-not-allowed'
               }`}
               style={{
                 borderColor: `${card.color}40`,
                 backgroundColor: `${card.color}08`,
               }}
-              whileHover={canInteract ? { scale: 1.03, y: -2 } : {}}
+              whileHover={canInteract ? { scale: 1.04 } : {}}
               whileTap={canInteract ? { scale: 0.97 } : {}}
             >
               <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: card.color, boxShadow: `0 0 8px ${card.color}70` }}
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: card.color, boxShadow: `0 0 6px ${card.color}70` }}
               />
-              <span className="text-[11px] font-mono" style={{ color: card.color }}>
+              <span className="text-[9px] sm:text-[10px] font-mono" style={{ color: card.color }}>
                 {card.name}
               </span>
-              <span className="text-[9px] text-text-secondary font-mono">{card.effect}</span>
+              <span className="text-[8px] sm:text-[9px] text-text-secondary/70 font-mono leading-tight">{card.effect}</span>
             </motion.button>
           ))}
-        </div>
         </div>
       </div>
 
