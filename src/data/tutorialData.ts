@@ -76,7 +76,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         highlight: true,
       },
       {
-        text: '每张卡片的效果不同，选择和顺序都会影响最终结果。特殊访客「漂泊者」需要四张卡片才能完成调制。',
+        text: '每张卡片的效果不同，选择和顺序都会影响最终结果。',
       },
     ],
     highlights: [
