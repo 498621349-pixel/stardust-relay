@@ -119,16 +119,16 @@ export interface AchievementDef {
 }
 
 export const ACHIEVEMENT_DEFS: AchievementDef[] = [
-  { id: 'first_cure',      name: '初次治愈',     desc: '成功治愈第一位访客',              icon: '🌟' },
-  { id: 'five_cures',      name: '五星好评',     desc: '累计成功治愈 5 次',               icon: '⭐' },
-  { id: 'ten_cures',       name: '金牌调度员',   desc: '累计成功治愈 10 次',              icon: '🏆' },
-  { id: 'streak_3',        name: '连战连捷',     desc: '连续 3 次成功（不间断）',         icon: '🔥' },
-  { id: 'all_visitors',   name: '全员治愈',     desc: '所有 5 位访客至少治愈 1 次',      icon: '🌈' },
-  { id: 'day_7',          name: '第一周完成',   desc: '存活到第 7 天',                   icon: '🛸' },
-  { id: 'day_30',         name: '资深调度员',   desc: '存活到第 30 天',                  icon: '🌌' },
-  { id: 'high_score_500', name: '高分选手',    desc: '积分达到 500',                   icon: '💯' },
-  { id: 'fail_and_return', name: '愈挫愈勇',    desc: '失败后继续坚持并成功治愈',        icon: '💪' },
-  { id: 'trust_all',      name: '完全信任',    desc: '将任意一位访客提升至「信任」等级', icon: '💜' },
+  { id: 'first_cure',      name: '初次治愈',     desc: '「我听见你了。」——第一次说出这句话',         icon: '🌟' },
+  { id: 'five_cures',      name: '五星好评',     desc: '五杯恰到好处的特饮，五次被看见的相遇',       icon: '⭐' },
+  { id: 'ten_cures',       name: '金牌调度员',   desc: '十次精准的逻辑调制，驿站的灯塔愈发明亮',     icon: '🏆' },
+  { id: 'streak_3',        name: '连战连捷',     desc: '三位访客接连得到治愈，心流从未中断',         icon: '🔥' },
+  { id: 'all_visitors',   name: '全员治愈',     desc: '九位漂泊者全部得到回应，驿站信号满格',       icon: '🌈' },
+  { id: 'day_7',          name: '第一周完成',   desc: '一周的守望，驿站在深空中站稳了脚跟',         icon: '🛸' },
+  { id: 'day_30',         name: '资深调度员',   desc: '一个月的坚守，你已不再是新手',               icon: '🌌' },
+  { id: 'high_score_500', name: '高分选手',    desc: '积分突破 500，你的调度直觉已臻化境',         icon: '💯' },
+  { id: 'fail_and_return', name: '愈挫愈勇',    desc: '失败过，但从未放弃——这才是真正的调度员',     icon: '💪' },
+  { id: 'trust_all',      name: '完全信任',    desc: '有人向你敞开了全部的故事，你们之间有了默契',   icon: '💜' },
 ]
 
 export interface AchievementsState {

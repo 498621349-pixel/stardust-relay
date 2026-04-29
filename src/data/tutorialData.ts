@@ -44,6 +44,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       { text: 'eco 节能', color: '#00F2FF' },
       { text: 'normal 正常', color: '#5EC0D8' },
       { text: 'overload 超载', color: '#FF8C00' },
+      { text: 'pressure 压力（跃迁后解锁）', color: '#FF4466' },
     ],
   },
   {
@@ -68,14 +69,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     label: '卡牌',
-    title: '六张逻辑卡片',
+    title: '八张逻辑卡片',
     content: [
       {
         text: '卡片从左到右依次插入三个插槽，系统按顺序执行。初始参数是 {X:0.5, Y:0.5, Z:0.5}。',
         highlight: true,
       },
       {
-        text: '每张卡片的效果不同，选择和顺序都会影响最终结果。',
+        text: '每张卡片的效果不同，选择和顺序都会影响最终结果。特殊访客「漂泊者」需要四张卡片才能完成调制。',
       },
     ],
     highlights: [
@@ -85,6 +86,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       { text: '[滤波] 三轴均衡', color: '#AA64FF' },
       { text: '[相位] X↔Z 互换', color: '#0AC8B9' },
       { text: '[震荡] 回摆50%', color: '#D4A017' },
+      { text: '[锚定] Y-0.4', color: '#FFD700' },
+      { text: '[半衰] Y×0.5', color: '#FF69B4' },
     ],
     actionHint: '尝试将卡片拖入插槽，或点击选中后再点击目标插槽',
   },
