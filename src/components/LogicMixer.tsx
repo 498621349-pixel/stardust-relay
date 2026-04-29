@@ -1,12 +1,14 @@
 import { motion } from 'framer-motion'
-import { RotateCcw, Play, Loader2, ChevronRight, Save, Trash2, Zap, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react'
+import { RotateCcw, Play, Loader2, ChevronRight, Save, Trash2, Zap, ChevronDown, ChevronUp, Lightbulb, Users } from 'lucide-react'
 import { useGameStore } from '../store/gameStore'
+import { getContentUnlocks } from '../store/gameStore'
 import { LOGIC_CARDS, calculateResult, getTolerance } from '../data/cards'
 import { useSound } from '../hooks/useSound'
-import { getAffectionTier } from '../store/gamePersist'
+import { getAffectionTier, NPC_BACKSTORIES } from '../store/gamePersist'
 import { useEffect, useRef, useState } from 'react'
 import type { GamePhase } from '../store/gameStore'
 import type { MacroData } from '../store/gamePersist'
+import { NPC_TEMPLATES } from '../data/npcs'
 
 export function LogicMixer() {
   const slots = useGameStore((s) => s.slots)
@@ -41,6 +43,10 @@ export function LogicMixer() {
     if (!npc) return ''
     return npc.hintSoft
   }
+
+  const servedCount = useGameStore((s) => s.servedCount)
+  const totalPrestiges = useGameStore((s) => s.totalPrestiges)
+  const unlocks = getContentUnlocks(day, servedCount, totalPrestiges)
 
   // 同步音效开关状态（避免渲染时调用 setState）
   useEffect(() => {
@@ -97,25 +103,30 @@ export function LogicMixer() {
         </div>
       </div>
 
-      {/* Visitor info panel — always visible */}
-      <div className="mb-2 sm:mb-3 p-2 sm:p-3 rounded-lg border border-cyan-glow/15 bg-cyan-glow/5">
-        {npc ? (
-          <>
-            {/* Row 1: 名称 + 容差 + 身份 + 好感度 + XYZ 当前值 */}
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="text-[12px] sm:text-[14px] font-mono font-medium" style={{ color: npc.avatarColor }}>
-                {npc.name}
-              </span>
-              <span className="text-[9px] sm:text-[10px] font-mono text-cyan-glow/50 border border-cyan-glow/20 px-1.5 py-0.5 rounded">
-                容差 ±{((getTolerance(day, prestigeLevel)) * 100).toFixed(0)}%
-              </span>
-              <span className="text-[9px] sm:text-[10px] text-text-dim/60 font-mono">{npc.type}</span>
-              {currentTier !== '陌生' && (
-                <span className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `${tierColor}50`, backgroundColor: `${tierColor}12` }}>
-                  {currentTier}
+      {/* Two-column layout: visitor info (left) + profile panel (right) */}
+      <div className="flex gap-2 sm:gap-3 flex-shrink-0 mb-2 sm:mb-3 min-h-[80px] sm:min-h-[100px]">
+        {/* Left: Visitor info panel */}
+        <div className="flex-1 p-2 sm:p-3 rounded-lg border border-cyan-glow/15 bg-cyan-glow/5">
+          {npc ? (
+            <>
+              {/* Row 1: 名称 + 容差 + 身份 + 好感度 */}
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-[11px] sm:text-[13px] font-mono font-medium" style={{ color: npc.avatarColor }}>
+                  {npc.name}
                 </span>
-              )}
-              <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-[11px] tabular-nums ml-auto">
+                <span className="text-[9px] sm:text-[10px] font-mono text-cyan-glow/50 border border-cyan-glow/20 px-1.5 py-0.5 rounded">
+                  容差 ±{((getTolerance(day, prestigeLevel)) * 100).toFixed(0)}%
+                </span>
+                <span className="text-[9px] sm:text-[10px] text-text-dim/60 font-mono">{npc.type}</span>
+                {currentTier !== '陌生' && (
+                  <span className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `${tierColor}50`, backgroundColor: `${tierColor}12` }}>
+                    {currentTier}
+                  </span>
+                )}
+              </div>
+
+              {/* Row 2: XYZ 当前值 */}
+              <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-[11px] tabular-nums mb-1.5">
                 <span className="text-[#00F2FF]/60">X</span>
                 <span className="text-text-secondary">{(npc.currentX ?? 0.5).toFixed(2)}</span>
                 <span className="text-[#5EC0D8]/60">Y</span>
@@ -123,37 +134,69 @@ export function LogicMixer() {
                 <span className="text-[#AA64FF]/60">Z</span>
                 <span className="text-text-secondary">{(npc.currentZ ?? 0.5).toFixed(2)}</span>
               </div>
-            </div>
 
-            {/* Row 2: 提示语 */}
-            <div className="flex items-start gap-1.5 mb-2">
-              <Lightbulb size={12} className="text-cyan-glow/50 flex-shrink-0 mt-0.5" />
-              <span className="text-[9px] sm:text-[10px] text-cyan-glow/60 font-mono leading-relaxed">{getHint()}</span>
+              {/* Row 3: 提示语 */}
+              <div className="flex items-start gap-1.5">
+                <Lightbulb size={11} className="text-cyan-glow/50 flex-shrink-0 mt-0.5" />
+                <span className="text-[9px] sm:text-[10px] text-cyan-glow/60 font-mono leading-relaxed">{getHint()}</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <span className="text-[11px] sm:text-[12px] text-text-dim/50 font-mono tracking-wider">
+                {phase === 'scanning' ? '正在解析信号...' : '暂无访客信号 · 等待深空扫描...'}
+              </span>
             </div>
+          )}
+        </div>
 
-            {/* Row 3: E/P 状态条 */}
-            <div className="flex gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="text-[9px] text-text-dim font-mono mb-0.5">情绪 E</div>
-                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full bg-cyan-glow/50" style={{ width: `${npc.currentE * 100}%` }} />
-                </div>
+        {/* Right: Visitor profile panel */}
+        <div className="w-[120px] sm:w-[160px] p-2 sm:p-3 rounded-lg border border-white/8 bg-white/[0.02]">
+          {npc ? (
+            <>
+              <div className="text-[9px] sm:text-[10px] text-text-dim/60 font-mono uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <Users size={9} />
+                <span>档案</span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[9px] text-text-dim font-mono mb-0.5">逻辑缺损 P</div>
-                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full bg-orange-400/50" style={{ width: `${npc.currentP * 100}%` }} />
+
+              {/* Relationship network */}
+              {unlocks.relationshipNetwork && npc.relationships.length > 0 && (
+                <div className="mb-1.5">
+                  <div className="text-[8px] sm:text-[9px] text-text-dim/50 font-mono mb-1">关联</div>
+                  <div className="flex flex-wrap gap-1">
+                    {npc.relationships.map((relId) => {
+                      const relNpc = NPC_TEMPLATES.find(n => n.id === relId)
+                      return relNpc ? (
+                        <span
+                          key={relId}
+                          className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded border"
+                          style={{ color: relNpc.avatarColor, borderColor: `${relNpc.avatarColor}40`, backgroundColor: `${relNpc.avatarColor}10` }}
+                        >
+                          {relNpc.name.split(' ')[0]}
+                        </span>
+                      ) : null
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Brief backstory (tier 1 if unlocked) */}
+              {NPC_BACKSTORIES[npc.id]?.[0] && (
+                <div>
+                  <div className="text-[8px] sm:text-[9px] text-text-dim/50 font-mono mb-0.5">背景</div>
+                  <div className="text-[9px] sm:text-[10px] text-text-dim/70 font-mono leading-relaxed line-clamp-3">
+                    {NPC_BACKSTORIES[npc.id][0].brief}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full gap-1">
+              <Users size={14} className="text-text-dim/20" />
+              <span className="text-[9px] sm:text-[10px] text-text-dim/30 font-mono text-center">访客档案</span>
             </div>
-          </>
-        ) : (
-          <div className="flex items-center justify-center h-16 sm:h-20">
-            <span className="text-[11px] sm:text-[12px] text-text-dim/50 font-mono tracking-wider">
-              {phase === 'scanning' ? '正在解析信号...' : '暂无访客信号 · 等待深空扫描...'}
-            </span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Slots and Preview Row */}
