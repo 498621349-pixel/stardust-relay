@@ -4,7 +4,7 @@ import { useGameStore } from '../store/gameStore'
 import { getContentUnlocks } from '../store/gameStore'
 import { LOGIC_CARDS, calculateResult, getTolerance } from '../data/cards'
 import { useSound } from '../hooks/useSound'
-import { getAffectionTier, NPC_BACKSTORIES } from '../store/gamePersist'
+import { getAffectionTier, NPC_BACKSTORIES, getNarrativeMode, selectNarrativeText, isStoryUnlocked } from '../store/gamePersist'
 import { useEffect, useRef, useState } from 'react'
 import type { GamePhase } from '../store/gameStore'
 import type { MacroData } from '../store/gamePersist'
@@ -29,6 +29,7 @@ export function LogicMixer() {
   const npcStats = useGameStore((s) => s.npcStats)
   const day = useGameStore((s) => s.day)
   const prestigeLevel = useGameStore((s) => s.prestigeLevel)
+  const oxygen = useGameStore((s) => s.resources.oxygen)
   const { play, setEnabled } = useSound()
 
   const [macroExpanded, setMacroExpanded] = useState(true)
@@ -104,7 +105,7 @@ export function LogicMixer() {
       </div>
 
       {/* Two-column layout: visitor info (left) + profile panel (right) */}
-      <div className="flex gap-2 sm:gap-3 flex-shrink-0 mb-2 sm:mb-3 min-h-[80px] sm:min-h-[100px]">
+      <div className="flex gap-2 sm:gap-3 flex-shrink-0 mb-2 sm:mb-2 min-h-[80px] sm:min-h-[100px]">
         {/* Left: Visitor info panel */}
         <div className="flex-1 p-2 sm:p-3 rounded-lg border border-cyan-glow/15 bg-cyan-glow/5">
           {npc ? (
@@ -180,15 +181,45 @@ export function LogicMixer() {
                 </div>
               )}
 
-              {/* Brief backstory (tier 1 if unlocked) */}
-              {NPC_BACKSTORIES[npc.id]?.[0] && (
-                <div>
-                  <div className="text-[8px] sm:text-[9px] text-text-dim/50 font-mono mb-0.5">背景</div>
-                  <div className="text-[9px] sm:text-[10px] text-text-dim/70 font-mono leading-relaxed line-clamp-3">
-                    {NPC_BACKSTORIES[npc.id][0].brief}
+              {/* Brief backstory (tier 1 if unlocked) - with oxygen-based narrative mode */}
+              {(() => {
+                const stories = NPC_BACKSTORIES[npc.id] ?? []
+                const unlockedStories = stories.filter(s => isStoryUnlocked(s, npcStats, prestigeLevel))
+                const narrativeMode = getNarrativeMode(oxygen)
+                return (
+                  <div>
+                    <div className="flex justify-between items-center mb-0.5">
+                      <div className="text-[8px] sm:text-[9px] text-text-dim/50 font-mono">背景</div>
+                      {/* 氧气状态提示 */}
+                      {narrativeMode !== 'full' && (
+                        <div className="text-[7px] sm:text-[8px] font-mono" style={{ color: oxygen < 50 ? '#FF6B6B' : '#FFA500' }}>
+                          {oxygen < 50 ? '💨 信号微弱' : '💨 故事截断'}
+                        </div>
+                      )}
+                    </div>
+                    {unlockedStories.map((story, idx) => {
+                      const { displayBrief, displayDetail, hintText } = selectNarrativeText(story.brief, story.detail, narrativeMode)
+                      const typeTag = story.type === 'letter' ? '📧' : story.type === 'crossover' ? '🔗' : story.type === 'reflection' ? '💭' : ''
+                      return (
+                        <div key={story.id} className="mb-1">
+                          <div className="text-[9px] sm:text-[10px] text-text-dim/70 font-mono leading-relaxed">
+                            {typeTag && <span className="mr-1">{typeTag}</span>}
+                            {displayBrief}
+                          </div>
+                          {displayDetail && (
+                            <div className={`text-[8px] sm:text-[9px] text-text-dim/50 font-mono leading-relaxed ${narrativeMode === 'minimal' ? 'line-clamp-1' : 'line-clamp-2'}`}>
+                              {displayDetail}
+                            </div>
+                          )}
+                          {idx === unlockedStories.length - 1 && hintText && (
+                            <div className="text-[7px] sm:text-[8px] text-text-dim/40 font-mono italic mt-0.5">{hintText}</div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-1">
@@ -337,33 +368,33 @@ export function LogicMixer() {
         </motion.div>
       )}
 
-      {/* Available Cards — single row, aligned with slot size */}
+      {/* Available Cards — 2 rows × 4 cols grid */}
       <div className="flex-shrink-0">
         <div className="text-[9px] sm:text-[10px] text-text-dim/60 font-mono mb-1.5 uppercase tracking-wider">可用逻辑卡片</div>
-        <div className="flex gap-1 sm:gap-2 overflow-x-auto">
+        <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
           {LOGIC_CARDS.map((card) => (
             <motion.button
               key={card.id}
               onClick={() => canInteract && (play('cardPlace'), placeCard(card.id))}
               disabled={!canInteract}
-              className={`relative flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-1 ${
+              className={`relative rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-1 px-2.5 py-4 ${
                 canInteract ? 'hover:brightness-110' : 'opacity-40 cursor-not-allowed'
               }`}
               style={{
                 borderColor: `${card.color}40`,
                 backgroundColor: `${card.color}08`,
               }}
-              whileHover={canInteract ? { scale: 1.05 } : {}}
+              whileHover={canInteract ? { scale: 1.03 } : {}}
               whileTap={canInteract ? { scale: 0.97 } : {}}
             >
               <div
                 className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: card.color, boxShadow: `0 0 8px ${card.color}70` }}
+                style={{ backgroundColor: card.color, boxShadow: `0 0 6px ${card.color}70` }}
               />
-              <span className="text-[10px] sm:text-[11px] font-mono" style={{ color: card.color }}>
+              <span className="text-[10px] sm:text-[11px] font-mono leading-tight text-center" style={{ color: card.color }}>
                 {card.name}
               </span>
-              <span className="text-[8px] sm:text-[9px] text-text-secondary/70 font-mono">{card.effect}</span>
+              <span className="text-[8px] sm:text-[9px] text-text-secondary/70 font-mono leading-tight text-center">{card.effect}</span>
             </motion.button>
           ))}
         </div>

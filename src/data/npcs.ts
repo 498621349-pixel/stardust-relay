@@ -419,6 +419,45 @@ const NPC_TEMPLATES: NPC[] = [
 
 import type { NpcStats } from '../store/gamePersist'
 
+// 方案 1A: 初始参数随机化
+// 每次访客被生成时，初始参数在目标值附近随机浮动，使每次相遇都是新谜题
+
+/**
+ * 在 [0, 1] 范围内随机化参数，带双向 clamp
+ * @param target 目标值
+ * @param range 浮动范围（±）
+ */
+function randomizeParam(target: number, range: number): number {
+  const min = Math.max(0, target - range)
+  const max = Math.min(1, target + range)
+  return min + Math.random() * (max - min)
+}
+
+// 方案 1A: 简单可解性保护——anchor/void/drift 三位极端目标值访客，
+// 随机化后若任意轴与目标差距超过 0.35，则 fallback 到模板固定值
+const EXTREME_NPC_RANGE_GUARD: Record<string, number> = {
+  anchor: 0.10,
+  void: 0.15,
+  drift: 0.15,
+}
+const TOLERANCE_FALLBACK_THRESHOLD = 0.35
+
+function randomizeWithGuard(npcId: string, targetX: number, targetY: number, targetZ: number): { currentX: number; currentY: number; currentZ: number } {
+  const range = EXTREME_NPC_RANGE_GUARD[npcId] ?? 0.20
+  let currentX = randomizeParam(targetX, range)
+  let currentY = randomizeParam(targetY, range)
+  let currentZ = randomizeParam(targetZ, range)
+
+  // 极端目标值访客：若任意轴差距超过阈值，fallback 该轴到模板固定值
+  if (EXTREME_NPC_RANGE_GUARD[npcId]) {
+    if (Math.abs(currentX - targetX) > TOLERANCE_FALLBACK_THRESHOLD) currentX = targetX
+    if (Math.abs(currentY - targetY) > TOLERANCE_FALLBACK_THRESHOLD) currentY = targetY
+    if (Math.abs(currentZ - targetZ) > TOLERANCE_FALLBACK_THRESHOLD) currentZ = targetZ
+  }
+
+  return { currentX, currentY, currentZ }
+}
+
 export function getWeightedRandomNPC(npcStats: Record<string, NpcStats> = {}): NPC {
   const weights = NPC_TEMPLATES.map((npc) => {
     const stats = npcStats[npc.id]
@@ -429,9 +468,27 @@ export function getWeightedRandomNPC(npcStats: Record<string, NpcStats> = {}): N
   let r = Math.random() * total
   for (let i = 0; i < NPC_TEMPLATES.length; i++) {
     r -= weights[i]
-    if (r <= 0) return NPC_TEMPLATES[i]
+    if (r <= 0) {
+      // 方案 1A: 生成随机初始参数（带极端值保护）
+      const npc = NPC_TEMPLATES[i]
+      const { currentX, currentY, currentZ } = randomizeWithGuard(npc.id, npc.targetX, npc.targetY, npc.targetZ)
+      return {
+        ...npc,
+        currentX,
+        currentY,
+        currentZ,
+      }
+    }
   }
-  return NPC_TEMPLATES[NPC_TEMPLATES.length - 1]
+  // fallback（不应走到这里）
+  const last = NPC_TEMPLATES[NPC_TEMPLATES.length - 1]
+  const { currentX, currentY, currentZ } = randomizeWithGuard(last.id, last.targetX, last.targetY, last.targetZ)
+  return {
+    ...last,
+    currentX,
+    currentY,
+    currentZ,
+  }
 }
 
 export { NPC_TEMPLATES }

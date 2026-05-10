@@ -16,6 +16,7 @@ import { TutorialSystem } from './components/TutorialSystem'
 import { PrestigeReview } from './components/PrestigeReview'
 import { OfflineReport } from './components/OfflineReport'
 import { VisitorQueuePicker } from './components/VisitorQueuePicker'
+import { DilemmaUI } from './components/DilemmaUI'
 import { RotateCcw, VolumeX, Moon, Sun, Music2 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { GamePhase } from './store/gameStore'
@@ -241,6 +242,9 @@ function App() {
 
       {/* v0.5 P1: 访客冲突队列选择器 */}
       <VisitorQueuePicker />
+
+      {/* 方案 3A: 道德困境系统 */}
+      <DilemmaUI />
 
       {/* Tutorial overlay */}
       <AnimatePresence>

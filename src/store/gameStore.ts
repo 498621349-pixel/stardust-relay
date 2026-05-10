@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { getWeightedRandomNPC, type NPC, NPC_TEMPLATES } from '../data/npcs'
 import { calculateResult, checkSuccess, getTolerance, getArrivalProbability } from '../data/cards'
-import { loadGame, saveGame, clearGame, type PersistedGameData, type MacroData, type NpcStats, type AchievementsState, checkAchievements as doCheckAchievements, type OfflineMessage, type PendingVisitor, type OfflineReport } from './gamePersist'
+import { loadGame, saveGame, clearGame, type PersistedGameData, type MacroData, type NpcStats, type AchievementsState, checkAchievements as doCheckAchievements, type OfflineMessage, type PendingVisitor, type OfflineReport, getRandomDilemmaEvent, getPrestigeIntro } from './gamePersist'
 
 // 加载存档（不存在时用默认）
 const savedData = loadGame()
@@ -142,20 +142,12 @@ function buildInitialData() {
       material: Math.min(100, resourcesWithOffline.material + actualMaterialGain),
     }
     // Day 20+: 离线期间可能产生访客冲突
-    const conflictCount = savedData.day >= 20 ? Math.floor(Math.random() * 3) : 0
-    const driftSignals = Math.floor(Math.random() * 2)
-    for (let i = 0; i < conflictCount; i++) {
-      const conflictNpc = getWeightedRandomNPC(savedData.npcStats ?? {})
-      pendingVisitorsFromOffline.push({
-        npcId: conflictNpc.id,
-        name: conflictNpc.name,
-        type: conflictNpc.type,
-        avatarColor: conflictNpc.avatarColor,
-        intro: conflictNpc.intro,
-        timestamp: Date.now() - offlineDuration + i * 60000,
-        leftMessage: getConflictLeaveMessage(conflictNpc.id),
-      })
-    }
+    // ⚠ 方案 1A 调整：离线冲突在游戏过程中产生，不在读档时重新随机
+    // pendingVisitorsFromOffline 已从存档恢复（line 126），其中 currentX/Y/Z 在上次关闭前已固定
+    // 离线时不再生成新的冲突访客，保持"同一个在等你的访客"的叙事感
+    // 报告数据从已恢复的队列中统计
+    const conflictCount = pendingVisitorsFromOffline.length
+    const driftSignals = 0  // 不再在离线时产生漂流信号
     if (conflictCount > 0 || driftSignals > 0) {
       offlineReportData = {
         hours: Math.floor(offlineHours * 10) / 10,
@@ -208,6 +200,9 @@ function buildInitialData() {
     offlineMessages,
     consecutiveFail: 0,
     consecutiveSuccess: 0,
+    // 方案 3A: 道德困境系统（不持久化，每次游戏重置）
+    currentDilemma: null,
+    dilemmaVisitedIds: [],
     // v0.5 P1: 访客冲突队列（从存档恢复）
     pendingVisitors: pendingVisitorsFromOffline,
     // v0.5 P1: 离线进度报告
@@ -224,6 +219,9 @@ function buildInitialData() {
       mostUsedRecipeCount: 0,
       bestStreak: savedData.streak ?? 0,
     },
+    // 方案 4A: 跃迁过场系统（不持久化，每次游戏重置）
+    prestigeStage: 'idle' as const,
+    prestigeStats: null,
   }
 }
 const initialData = buildInitialData()
@@ -279,6 +277,7 @@ export type GamePhase =
   | 'success'
   | 'failed'
   | 'emergency'
+  | 'dilemma'  // 方案 3A: 道德困境阶段
   | 'gameover'
 
 export interface Resources {
@@ -348,6 +347,20 @@ interface GameState {
     bestStreak: number
   }
 
+  // 方案 3A: 道德困境系统
+  currentDilemma: import('../store/gamePersist').DilemmaEvent | null  // 当前激活的困境
+  dilemmaVisitedIds: string[]  // 已经历过的困境 ID（避免重复触发）
+
+  // 方案 4A: 跃迁过场系统
+  prestigeStage: 'idle' | 'confirm' | 'animating' | 'resetting'  // 跃迁流程阶段
+  prestigeStats: {  // 本轮成绩摘要（重置前保存）
+    totalServed: number
+    unlockedStories: number
+    bestStreak: number
+    totalPrestiges: number
+    unlockedContent: string[]  // 本轮解锁的内容列表
+  } | null
+
   // Actions
   tick: () => void
   startArrival: () => void
@@ -383,6 +396,15 @@ interface GameState {
   acceptVisitor: (npcId: string) => void
   rejectVisitor: (npcId: string) => void
   dismissOfflineReport: () => void
+  // 方案 3A: 道德困境系统
+  triggerDilemma: () => void
+  resolveDilemma: (choiceId: string) => void
+  dismissDilemma: () => void
+  // 方案 4A: 跃迁过场系统
+  showPrestigeConfirm: () => void
+  cancelPrestige: () => void
+  startPrestigeAnimation: () => void
+  completePrestigeReset: () => void
 }
 
 const POWER_DRAIN: Record<PowerMode, number> = {
@@ -428,7 +450,23 @@ export const useGameStore = create<GameState>()((set, get) =>
     // 休息模式：能源不消耗，紧急/游戏结束也不触发
     const drain = state.isResting ? 0 : POWER_DRAIN[state.mode]
     const newEnergy = state.isResting ? state.resources.energy : state.resources.energy - drain
-    const newOxygen = state.isResting ? state.resources.oxygen : state.resources.oxygen - drain * 0.5
+    // 方案 2A: 氧气独立消耗（不再跟随能源）
+    // 根据模式决定氧气消耗/回复
+    let newOxygen: number
+    if (state.isResting) {
+      // 休息模式：缓慢回复 +0.002 / tick
+      newOxygen = Math.min(100, state.resources.oxygen + 0.002)
+    } else {
+      // 根据模式计算氧气消耗
+      const OXYGEN_DRAIN: Record<string, number> = {
+        eco: 0.004,
+        normal: 0.012,
+        overload: 0.025,
+        pressure: 0.025,
+      }
+      newOxygen = state.resources.oxygen - (OXYGEN_DRAIN[state.mode] ?? 0.012)
+    }
+    newOxygen = Math.max(0, newOxygen)
     let newMaterial = state.resources.material
 
     // 自动化小球：休息中也正常收集
@@ -467,12 +505,24 @@ export const useGameStore = create<GameState>()((set, get) =>
       if (newProgress >= 100) {
         const npc = getWeightedRandomNPC(state.npcStats)
         const tolerance = getTolerance(state.day, state.prestigeLevel)
+
+        // 方案 4A: 轮回台词检查（prestige >= 1 时，访客到来时显示轮回记忆）
+        let finalIntro = npc.intro
+        let finalSpeaker = `SIGNAL // ${npc.name}`
+        if (state.prestigeLevel >= 1) {
+          const prestigeText = getPrestigeIntro(npc.id, state.prestigeLevel)
+          if (prestigeText) {
+            finalIntro = `${prestigeText}\n\n${npc.intro}`
+            finalSpeaker = `RECALL // ${npc.name}`
+          }
+        }
+
         set({
           phase: 'arrived',
           npc,
           scanProgress: 0,
-          dialogText: `${npc.intro}当前容差范围：±${(tolerance * 100).toFixed(0)}%。`,
-          dialogSpeaker: `SIGNAL // ${npc.name}`,
+          dialogText: `${finalIntro}当前容差范围：±${(tolerance * 100).toFixed(0)}%。`,
+          dialogSpeaker: finalSpeaker,
           resources: { energy: Math.max(0, newEnergy), oxygen: Math.max(0, newOxygen), material: Math.min(100, newMaterial) },
         })
         get().addLog(`检测到访客信号：${npc.name}`, 'info')
@@ -524,7 +574,34 @@ const check = checkSuccess(result, { x: target.targetX, y: target.targetY, z: ta
             : newConsecutiveSuccess >= 3
               ? `连续治愈 ${newConsecutiveSuccess} 次。驿站的信号越来越稳定了。`
               : null
-set({
+// 方案 3A: 道德困境触发检查（极限模式，每 3 次连击触发一次）
+          if (state.mode === 'pressure' && newConsecutiveSuccess > 0 && newConsecutiveSuccess % 3 === 0) {
+            const dilemma = getRandomDilemmaEvent()
+            set({
+              phase: 'dilemma' as const,
+              brewProgress: 0,
+              resultParams: result,
+              score: state.score + scoreGain,
+              servedCount: state.servedCount + 1,
+              day: state.day + dayAdvance,
+              streak: newStreak,
+              achievements: newAchievements,
+              consecutiveFail: 0,
+              consecutiveSuccess: newConsecutiveSuccess,
+              resources: {
+                energy: Math.min(100, Math.max(0, newEnergy) + (isPressure ? 15 : 25)),
+                oxygen: Math.min(100, newOxygen + 20),
+                material: Math.min(100, Math.max(0, newMaterial) + (isPressure ? 15 : 25)),
+              },
+              currentDilemma: dilemma,
+              dialogText: `${line}\n\n⚠ 检测到特殊信号：两位访客同时请求接入...`,
+              dialogSpeaker: target.name,
+            })
+            get().addLog(`道德困境触发：${dilemma.visitorA} 与 ${dilemma.visitorB}`, 'warning')
+            return
+          }
+
+          set({
             phase: 'success',
             brewProgress: 0,
             resultParams: result,
@@ -537,7 +614,7 @@ set({
             consecutiveSuccess: newConsecutiveSuccess,
             resources: {
               energy: Math.min(100, Math.max(0, newEnergy) + (isPressure ? 15 : 25)),
-              oxygen: Math.min(100, Math.max(0, newOxygen) + (isPressure ? 8 : 15)),
+              oxygen: Math.min(100, newOxygen + 20),  // 方案 2A: 治愈成功固定 +20 氧气
               material: Math.min(100, Math.max(0, newMaterial) + (isPressure ? 15 : 25)),
             },
             dialogText: line,
@@ -571,9 +648,10 @@ get().addLog(`调制成功！${target.name} 已治愈。${isPressure ? '+150' : 
             achievements: newAchievements,
             consecutiveFail: newConsecutiveFail,
             consecutiveSuccess: 0,
+            // 方案 2A: 治愈失败氧气无变化（不做双重惩罚）
             resources: {
               energy: Math.max(0, Math.max(0, newEnergy) - 3),
-              oxygen: Math.max(0, Math.max(0, newOxygen) - 1),
+              oxygen: Math.max(0, newOxygen),  // 氧气不变
               material: Math.max(0, Math.max(0, newMaterial) - 3),
             },
             dialogText: line,
@@ -607,6 +685,9 @@ get().addLog(`调制成功！${target.name} 已治愈。${isPressure ? '+150' : 
             intro: arrivingNpc.intro,
             timestamp: Date.now(),
             leftMessage: getConflictLeaveMessage(arrivingNpc.id),
+            currentX: arrivingNpc.currentX,
+            currentY: arrivingNpc.currentY,
+            currentZ: arrivingNpc.currentZ,
           }
           set({
             pendingVisitors: [...state.pendingVisitors, newPending],
@@ -1081,8 +1162,14 @@ setMode: (mode: PowerMode) => {
     if (!visitor) return
     const fullNpc = NPC_TEMPLATES.find((n) => n.id === npcId)
     if (!fullNpc) return
+    // 方案 1A: 使用队列中固定的随机化参数，而非模板固定值
     set({
-      npc: fullNpc,
+      npc: {
+        ...fullNpc,
+        currentX: visitor.currentX,
+        currentY: visitor.currentY,
+        currentZ: visitor.currentZ,
+      },
       phase: 'arrived',
       pendingVisitors: state.pendingVisitors.filter((v) => v.npcId !== npcId),
       dialogText: `${fullNpc.intro}当前容差范围：±${(getTolerance(state.day, state.prestigeLevel) * 100).toFixed(0)}%。`,
@@ -1108,6 +1195,167 @@ setMode: (mode: PowerMode) => {
 
   dismissOfflineReport: () => {
     set({ offlineReport: null })
+  },
+
+  // ===== 方案 3A: 道德困境系统 =====
+  triggerDilemma: () => {
+    // 此函数由 tick() 中自动调用，不需要手动触发
+    // 这里保留作为备用接口
+  },
+
+  resolveDilemma: (choiceId: string) => {
+    const state = get()
+    const dilemma = state.currentDilemma
+    if (!dilemma) return
+
+    const choice = dilemma.choices.find(c => c.id === choiceId)
+    if (!choice) return
+
+    // 应用选择效果
+    const newEnergy = Math.max(0, state.resources.energy + choice.effect.energy)
+    const skippedNames = choice.effect.visitorsSkipped
+      ? choice.effect.visitorsSkipped.map(id => {
+          const npc = NPC_TEMPLATES.find(n => n.id === id)
+          return npc?.name ?? id
+        }).join('、')
+      : ''
+
+    set({
+      phase: 'idle' as const,
+      currentDilemma: null,
+      dilemmaVisitedIds: [...state.dilemmaVisitedIds, dilemma.id],
+      resources: {
+        ...state.resources,
+        energy: newEnergy,
+      },
+      dialogText: `你做出了选择：${choice.text}\n能源 ${choice.effect.energy > 0 ? '+' : ''}${choice.effect.energy}。${skippedNames ? `被跳过的访客：${skippedNames}。` : ''}`,
+      dialogSpeaker: 'SYSTEM // 道德抉择',
+    })
+    get().addLog(`道德困境选择：${choice.text}（${choice.effect.energy > 0 ? '+' : ''}${choice.effect.energy} 能源）`, 'info')
+    autoSave(get())
+  },
+
+  dismissDilemma: () => {
+    const state = get()
+    if (!state.currentDilemma) return
+    set({
+      phase: 'idle' as const,
+      currentDilemma: null,
+      dilemmaVisitedIds: [...state.dilemmaVisitedIds, state.currentDilemma.id],
+      dialogText: '道德困境已取消。驿站继续运行。',
+      dialogSpeaker: 'SYSTEM // 星尘驿站',
+    })
+    get().addLog('道德困境已取消', 'info')
+  },
+
+  // ===== 方案 4A: 跃迁过场系统 =====
+  showPrestigeConfirm: () => {
+    const state = get()
+    // 计算本轮成绩（保存到 prestigeStats，重置前使用）
+    const stats = state.npcStats
+    const totalServed = Object.values(stats).reduce((sum, s) => sum + s.successCount, 0)
+
+    // 计算已解锁的故事数（tier 1 + tier 2）
+    // tier 1 解锁：successCount >= 1，tier 2 解锁：successCount >= 2
+    let unlockedStories = 0
+    NPC_TEMPLATES.forEach(npc => {
+      const npcStat = stats[npc.id]
+      if (!npcStat) return
+      if (npcStat.successCount >= 1) unlockedStories++  // tier 1
+      if (npcStat.successCount >= 2) unlockedStories++  // tier 2
+    })
+
+    // 计算已解锁的内容层级
+    const unlockedContent: string[] = []
+    if (state.totalPrestiges >= 0) unlockedContent.push('基础游戏内容')
+    if (state.totalPrestiges >= 1) unlockedContent.push('轮回记忆开场台词')
+    if (state.totalPrestiges >= 2) unlockedContent.push('跨轮回故事')
+    if (state.totalPrestiges >= 5) unlockedContent.push('永恒轮回者成就')
+
+    set({
+      prestigeStage: 'confirm' as const,
+      prestigeStats: {
+        totalServed,
+        unlockedStories,
+        bestStreak: state.streak,
+        totalPrestiges: state.totalPrestiges,
+        unlockedContent,
+      },
+      dialogText: '即将启动星际跃迁。本轮成绩将被封存。是否继续？',
+      dialogSpeaker: 'SYSTEM // 星际跃迁',
+    })
+    get().addLog('跃迁确认界面已打开', 'info')
+  },
+
+  cancelPrestige: () => {
+    set({
+      prestigeStage: 'idle' as const,
+      prestigeStats: null,
+      dialogText: '跃迁已取消。驿站继续运行。',
+      dialogSpeaker: 'SYSTEM // 星尘驿站',
+    })
+    get().addLog('跃迁已取消', 'info')
+  },
+
+  startPrestigeAnimation: () => {
+    set({
+      prestigeStage: 'animating' as const,
+      dialogText: '跃迁协议已激活。驿站的信号穿过星际网络……',
+      dialogSpeaker: 'SYSTEM // 星际跃迁',
+    })
+    get().addLog('跃迁动画开始', 'info')
+    // 3-5 秒后自动进入 resetting 阶段
+    setTimeout(() => {
+      set({ prestigeStage: 'resetting' as const })
+    }, 3500)
+  },
+
+  completePrestigeReset: () => {
+    const state = get()
+    const newLevel = Math.min(state.prestigeLevel + 1, 5)
+    // 计算本局统计
+    const stats = state.npcStats
+    const totalServed = Object.values(stats).reduce((sum, s) => sum + s.successCount, 0)
+    // 最喜欢的访客
+    let favoriteVisitor: string | null = null
+    let favoriteCount = 0
+    Object.entries(stats).forEach(([id, s]) => {
+      if (s.successCount > favoriteCount) {
+        favoriteCount = s.successCount
+        favoriteVisitor = id
+      }
+    })
+    set({
+      prestigeStage: 'idle' as const,
+      prestigeStats: null,
+      phase: 'idle',
+      npc: null,
+      slots: [null, null, null],
+      resources: { energy: 100, oxygen: 100, material: 100 },
+      score: 0,
+      servedCount: 0,
+      day: 1,
+      streak: 0,
+      dialogText: '跃迁完成。驿站的记忆被重置了，档案被封存，信号被清空。但也许......他们还会来。',
+      dialogSpeaker: 'SYSTEM // 星际跃迁',
+      prestigeLevel: newLevel,
+      totalPrestiges: state.totalPrestiges + 1,
+      pendingVisitors: [],
+      offlineMessages: [],
+      consecutiveFail: 0,
+      consecutiveSuccess: 0,
+      failCountThisSession: {},
+      sessionStats: {
+        totalServed,
+        favoriteVisitor,
+        favoriteVisitorCount: favoriteCount,
+        mostUsedRecipe: null,
+        mostUsedRecipeCount: 0,
+        bestStreak: state.streak,
+      },
+    })
+    get().addLog(`星际跃迁完成！容差加成 +5%（当前 ${newLevel} 层）`, 'success')
+    autoSave(get())
   },
 
 }))

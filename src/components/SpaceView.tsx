@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMemo, useState, useEffect } from 'react'
 import { useGameStore } from '../store/gameStore'
-import { ScanLine, Radio, Snowflake, Flame, Radio as RadioIcon, User, Palette } from 'lucide-react'
+import { ScanLine, Radio, Snowflake, Flame, Radio as RadioIcon, User, Palette, Zap, Rocket, Heart } from 'lucide-react'
 
 // 流星
 function ShootingStar({ delay }: { delay: number }) {
@@ -164,6 +164,10 @@ function SpaceNPCVisual({ type, color, name, isSuccess, isFailed }: { type: stri
       case '通讯中继站AI': return <RadioIcon size={48} style={{ color: isSuccess ? '#AA64FF' : muted }} />
       case '冬眠宇航员': return <User size={48} style={{ color: isSuccess ? '#5EC0D8' : muted }} />
       case '艺术生成AI': return <Palette size={48} style={{ color: isSuccess ? '#FF6B9D' : muted }} />
+      case '量子观测AI': return <Zap size={48} style={{ color: isSuccess ? '#FFD700' : muted }} />
+      case '远航船幼儿': return <Rocket size={48} style={{ color: isSuccess ? '#FFD700' : muted }} />
+      case '古老广播站AI': return <RadioIcon size={48} style={{ color: isSuccess ? '#AA64FF' : muted }} />
+      case '医疗舱AI': return <Heart size={48} style={{ color: isSuccess ? '#FF6B9D' : muted }} />
       default: return <div className="w-12 h-12 rounded-full" style={{ backgroundColor: isSuccess ? '#00F2FF' : muted }} />
     }
   }
